@@ -1,0 +1,26 @@
+server:
+  port: 30601
+  servlet:
+    encoding:
+      charset: UTF-8
+
+spring:
+  application:
+    name: algo-core
+  profiles:
+    active: local
+    servlet:
+      multipart:
+        maxFileSize: 10MB
+        maxRequestSize: 10MB
+      encoding:
+        charset: UTF-8
+    devtools:
+      restart:
+        enabled: false #운영 에서는 제거.
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: refresh, info, keepalive, health, metrics
