@@ -2,6 +2,8 @@ package com.example.algo.adapters.interfaces.rest.inbound
 
 import com.example.algo.adapters.interfaces.rest.dto.request.CharacterRequest
 import com.example.algo.adapters.interfaces.rest.dto.response.CharacterResponse
+import com.example.algo.adapters.interfaces.rest.dto.response.StarForceDTO
+import com.example.algo.application.domain.enum.StarForceEvent
 import com.example.algo.application.inbound.AlgoCommandService
 import com.example.algo.application.inbound.AlgoQueryService
 import org.springframework.http.MediaType
@@ -13,6 +15,7 @@ import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.RequestParam
 import org.springframework.web.bind.annotation.RestController
 import org.springframework.web.util.UriComponentsBuilder
+import java.math.BigDecimal
 
 @RequestMapping(value=["/algo"])
 @RestController
@@ -49,5 +52,31 @@ class AlgoController(
             .ok()
             .contentType(MediaType.APPLICATION_JSON)
             .body(query.getCharacter(name, boss))
+    }
+
+    @GetMapping(value= ["/star-force"])
+    fun getStarForceChance(
+        @RequestParam req: Int,
+        @RequestParam count: Int,
+        @RequestParam step: Int,
+        @RequestParam target: Int,
+        @RequestParam destroy: Boolean,
+        @RequestParam(defaultValue = "NONE") event: StarForceEvent
+    ) : ResponseEntity<StarForceDTO> {
+        return ResponseEntity
+            .ok()
+            .contentType(MediaType.APPLICATION_JSON)
+            .body(query.getStarForceChance(req, count, step, target, destroy, event))
+    }
+
+    @GetMapping(value= ["/star-force/cost"])
+    fun getStarForceChance(
+        @RequestParam req: Int,
+        @RequestParam step: Int
+    ) : ResponseEntity<BigDecimal> {
+        return ResponseEntity
+            .ok()
+            .contentType(MediaType.APPLICATION_JSON)
+            .body(query.getStarForceCost(req, step))
     }
 }
