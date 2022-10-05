@@ -14,7 +14,7 @@ interface AlgoQueryService {
     fun b1003()
     fun getCharacters(): List<CharacterResponse>
     fun getCharacter(name: String, boss: Int): List<CharacterResponse>
-    fun getStarForceChance(req: Int, count: Int, step: Int, target: Int, destroy:Boolean, event: StarForceEvent): StarForceDTO
+    fun getStarForceChance(req: Int, count: Int, step: Int, target: Int, destroy:Boolean, catch:Boolean, event: StarForceEvent): StarForceDTO
     fun getStarForceCost(req: Int, step: Int): BigDecimal
 }
 
@@ -33,7 +33,7 @@ class AlgoQueryServiceImpl (
         return service.getCharacter(name, boss)
     }
 
-    override fun getStarForceChance(req: Int, count: Int, step: Int, target: Int, destroy:Boolean, event: StarForceEvent): StarForceDTO {
+    override fun getStarForceChance(req: Int, count: Int, step: Int, target: Int, destroy:Boolean, catch:Boolean, event: StarForceEvent): StarForceDTO {
         var returnValues = mutableListOf<StarForceDTO>()
         var costs = mutableListOf<BigInteger>()
         val format = DecimalFormat("#,###")
@@ -43,7 +43,7 @@ class AlgoQueryServiceImpl (
             var returnValue = StarForceDTO()
             var cost = BigInteger.ZERO
             while(stepValue != target) {
-                cost += calcEnforceValue(req, stepValue, destroy).toBigInteger()
+                cost += calcEnforceValue(req, stepValue, destroy, event).toBigInteger()
                 //println("cost : $cost")
                 returnValue.EnforceCount++
                 //println("EnforceCount : " + returnValue.cost)
@@ -52,7 +52,9 @@ class AlgoQueryServiceImpl (
                 //println("mathValue : " + returnValue.cost)
                 var successFlg: Int // 0 = 성공 1은 실패 2는 터짐
                 //println("probability : " + calcProbability(stepValue, true))
-                if(mathValue < calcProbability(stepValue, true, event)) {
+                var probValue = calcProbability(stepValue, catch, event)
+                //println(probValue)
+                if(mathValue < probValue) {
                     successFlg = 0
                 } else if (mathValue > 100-calcDestroy(stepValue, destroy)) {
                     successFlg = 2
@@ -63,21 +65,29 @@ class AlgoQueryServiceImpl (
                 }
 
                 when (successFlg) {
-                    0 -> {
-                        stepValue++
+                    0 -> { // 성공시
+                        if(event == StarForceEvent.ONE_PLUS_ONE && stepValue <= 10)
+                            stepValue += 2
+                        else
+                            stepValue++
                     }
 
-                    1 -> {
+                    1 -> { // 실패시
                         when(stepValue) {
-                            5, 10, 15, 20 -> {
+                            in 0..10 -> {
                                 stepValue
                             }
+
+                            15, 20 -> {
+                                stepValue
+                            }
+
                             else -> {
                                 stepValue--
                             }
                         }
                     }
-                    2 -> {
+                    2 -> { // 터짐
                         stepValue = 12
                     }
                 }
@@ -96,30 +106,31 @@ class AlgoQueryServiceImpl (
     }
 
     override fun getStarForceCost(req: Int, step: Int): BigDecimal {
-        return calcEnforceValue(req, step, false).toBigDecimal()
+        return calcEnforceValue(req, step, false, StarForceEvent.NONE).toBigDecimal()
     }
 
-    fun calcEnforceValue(req: Int, step: Int, destroy: Boolean): Int {
+    fun calcEnforceValue(req: Int, step: Int, destroy: Boolean, event: StarForceEvent): Int {
         var returnValue = 1000
         val reqValue = req*req*req
         val stepValue: Double = (step+1).toDouble()
+        val eventValue = if(event == StarForceEvent.DISCOUNT || event == StarForceEvent.SHINING) 0.7 else 1.0
         return when (step) {
             in 0..9 -> {
-                (returnValue+reqValue*stepValue/25).toInt()
+                ((returnValue+reqValue*stepValue/25) * eventValue).toInt()
             }
 
             in 10..11-> {
-                (returnValue+reqValue*stepValue.pow(2.7)/400).toInt()
+                ((returnValue+reqValue*stepValue.pow(2.7)/400) * eventValue).toInt()
             }
 
             in 12..14-> {
-                if(destroy) (returnValue+reqValue*stepValue.pow(2.7)/400 + returnValue+reqValue*stepValue.pow(2.7)/400).toInt()
-                else (returnValue+reqValue*stepValue.pow(2.7)/400).toInt()
+                if(destroy) (returnValue+reqValue*stepValue.pow(2.7)/400 + (returnValue+reqValue*stepValue.pow(2.7)/400) * eventValue).toInt()
+                else ((returnValue+reqValue*stepValue.pow(2.7)/400) * eventValue).toInt()
             }
 
             else -> {
-                if(destroy) (returnValue+reqValue*stepValue.pow(2.7)/200 + returnValue+reqValue*stepValue.pow(2.7)/200).toInt()
-                else (returnValue+reqValue*stepValue.pow(2.7)/200).toInt()
+                if(destroy) (returnValue+reqValue*stepValue.pow(2.7)/200 + (returnValue+reqValue*stepValue.pow(2.7)/200 * eventValue)).toInt()
+                else ((returnValue+reqValue*stepValue.pow(2.7)/200) * eventValue).toInt()
             }
         }
     }
@@ -136,11 +147,34 @@ class AlgoQueryServiceImpl (
                 (95.0 - stepValue) * weight
             }
 
-            in 3..14 -> {
+            in 3..4 -> {
                 (100.0 - stepValue) * weight
             }
 
-            in 15.. 21 -> {
+            5 -> {
+                if(event == StarForceEvent.SUCCESS || event == StarForceEvent.SHINING) 100.0
+                else (100.0 - stepValue) * weight
+            }
+
+            in 6..9 -> {
+                (100.0 - stepValue) * weight
+            }
+
+            10 -> {
+                if(event == StarForceEvent.SUCCESS || event == StarForceEvent.SHINING) 100.0
+                else (100.0 - stepValue) * weight
+            }
+
+            in 11..14 -> {
+                (100.0 - stepValue) * weight
+            }
+
+            15 -> {
+                if(event == StarForceEvent.SUCCESS || event == StarForceEvent.SHINING) 100.0
+                else 30.0 * weight
+            }
+
+            in 16.. 21 -> {
                 30.0 * weight
             }
 
