@@ -48,7 +48,8 @@ class AlgoQueryServiceImpl (
         val format = DecimalFormat("#,###")
 
         val dateTime = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMddHHmmss"))
-        val path = "/Users/ahnbyeongeon/Documents/test"
+        val home = System.getProperty("user.home")
+        val path = "$home/Documents/test"
         val fileName = "Star Force Test__$dateTime.txt"
         val file = File(path, fileName)
         val bwFile = BufferedWriter(FileWriter(file))
