@@ -5,9 +5,18 @@ import com.example.algo.adapters.interfaces.rest.dto.response.StarForceDTO
 import com.example.algo.application.domain.enum.StarForceEvent
 import com.example.algo.application.outbound.AlgoService
 import org.springframework.stereotype.Service
+import java.io.BufferedWriter
+import java.io.File
+import java.io.FileWriter
+import java.io.OutputStreamWriter
 import java.math.BigDecimal
 import java.math.BigInteger
+import java.nio.file.Files
+import java.nio.file.Paths
+import java.nio.file.StandardOpenOption
 import java.text.DecimalFormat
+import java.time.LocalDateTime
+import java.time.format.DateTimeFormatter
 import kotlin.math.pow
 
 interface AlgoQueryService {
@@ -38,34 +47,62 @@ class AlgoQueryServiceImpl (
         var costs = mutableListOf<BigInteger>()
         val format = DecimalFormat("#,###")
 
+        val dateTime = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMddHHmmss"))
+        val path = "/Users/ahnbyeongeon/Documents/test"
+        val fileName = "Star Force Test__$dateTime.txt"
+        val file = File(path, fileName)
+        val bwFile = BufferedWriter(FileWriter(file))
+
         for(i in 1 .. count) {
             var stepValue = step
             var returnValue = StarForceDTO()
             var cost = BigInteger.ZERO
+            var failedStack = 0
             while(stepValue != target) {
                 cost += calcEnforceValue(req, stepValue, destroy, event).toBigInteger()
                 //println("cost : $cost")
                 returnValue.EnforceCount++
                 //println("EnforceCount : " + returnValue.cost)
-
                 val mathValue = Math.random() * 100
+                var text = "mathValue : $mathValue\n"
+                bwFile.write(text)
+                bwFile.flush()
                 //println("mathValue : " + returnValue.cost)
                 var successFlg: Int // 0 = 성공 1은 실패 2는 터짐
-                //println("probability : " + calcProbability(stepValue, true))
+                text = "probability : " + calcProbability(stepValue, catch, event) + "\n"
+                bwFile.write(text)
+                bwFile.flush()
                 var probValue = calcProbability(stepValue, catch, event)
                 //println(probValue)
-                if(mathValue < probValue) {
+                if (failedStack == 2){
                     successFlg = 0
+                    text = "$stepValue 에서 확정 강화 성공\n"
+                    bwFile.write(text)
+                    bwFile.flush()
+                }
+                else if(mathValue < probValue) {
+                    successFlg = 0
+                    text = "$stepValue 에서 강화 성공\n"
+                    bwFile.write(text)
+                    bwFile.flush()
                 } else if (mathValue > 100-calcDestroy(stepValue, destroy)) {
                     successFlg = 2
                     returnValue.destroyCount++
+                    text = "$stepValue 에서 터짐\n"
+                    bwFile.write(text)
+                    bwFile.flush()
+                    failedStack = 0
                     //println("************ 터짐 *************")
                 } else {
                     successFlg = 1
+                    text = "$stepValue 에서 실패\n"
+                    bwFile.write(text)
+                    bwFile.flush()
                 }
 
                 when (successFlg) {
                     0 -> { // 성공시
+                        failedStack = 0
                         if(event == StarForceEvent.ONE_PLUS_ONE && stepValue <= 10)
                             stepValue += 2
                         else
@@ -84,11 +121,13 @@ class AlgoQueryServiceImpl (
 
                             else -> {
                                 stepValue--
+                                failedStack++
                             }
                         }
                     }
                     2 -> { // 터짐
                         stepValue = 12
+                        failedStack = 0
                     }
                 }
                 //println("stepValue : $stepValue")
@@ -97,6 +136,11 @@ class AlgoQueryServiceImpl (
             returnValue.cost = format.format(cost)
             returnValues.add(returnValue)
         }
+
+        var text = "Total Cost : " + format.format(costs.sumOf { it }.div(count.toBigInteger()))+ "\n"
+        bwFile.write(text)
+        bwFile.flush()
+        bwFile.close()
 
         return StarForceDTO(
             returnValues.sumOf { it.EnforceCount }/count,
@@ -128,9 +172,13 @@ class AlgoQueryServiceImpl (
                 else ((returnValue+reqValue*stepValue.pow(2.7)/400) * eventValue).toInt()
             }
 
-            else -> {
+            in 15 .. 16 -> {
                 if(destroy) (returnValue+reqValue*stepValue.pow(2.7)/200 + (returnValue+reqValue*stepValue.pow(2.7)/200 * eventValue)).toInt()
                 else ((returnValue+reqValue*stepValue.pow(2.7)/200) * eventValue).toInt()
+            }
+
+            else -> {
+                ((returnValue+reqValue*stepValue.pow(2.7)/200) * eventValue).toInt()
             }
         }
     }
@@ -206,9 +254,14 @@ class AlgoQueryServiceImpl (
             14 -> {
                 if(destroy) 0.0 else 1.4
             }
-            in 15..17 -> {
+            in 15..16 -> {
                 if(destroy) 0.0 else 2.1
             }
+
+            17 -> {
+                2.1
+            }
+
             in 18..19 -> {
                 2.8
             }
