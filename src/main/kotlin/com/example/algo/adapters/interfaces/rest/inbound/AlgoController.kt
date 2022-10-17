@@ -2,7 +2,10 @@ package com.example.algo.adapters.interfaces.rest.inbound
 
 import com.example.algo.adapters.interfaces.rest.dto.request.CharacterRequest
 import com.example.algo.adapters.interfaces.rest.dto.response.CharacterResponse
+import com.example.algo.adapters.interfaces.rest.dto.response.CubeDTO
 import com.example.algo.adapters.interfaces.rest.dto.response.StarForceDTO
+import com.example.algo.application.domain.enum.CubeType
+import com.example.algo.application.domain.enum.RareType
 import com.example.algo.application.domain.enum.StarForceEvent
 import com.example.algo.application.inbound.AlgoCommandService
 import com.example.algo.application.inbound.AlgoQueryService
@@ -79,5 +82,20 @@ class AlgoController(
             .ok()
             .contentType(MediaType.APPLICATION_JSON)
             .body(query.getStarForceCost(req, step))
+    }
+
+    @GetMapping(value= ["/cube/level-up"])
+    fun getCubeLevelUp(
+        @RequestParam cube: CubeType,
+        @RequestParam count: Int,
+        @RequestParam req: Int,
+        @RequestParam base: RareType,
+        @RequestParam target: RareType,
+        @RequestParam event: Boolean
+    ) : ResponseEntity<CubeDTO> {
+        return ResponseEntity
+            .ok()
+            .contentType(MediaType.APPLICATION_JSON)
+            .body(query.getCubeLevelUp(req, cube, count, base, target, event))
     }
 }

@@ -1,7 +1,10 @@
 package com.example.algo.application.inbound
 
 import com.example.algo.adapters.interfaces.rest.dto.response.CharacterResponse
+import com.example.algo.adapters.interfaces.rest.dto.response.CubeDTO
 import com.example.algo.adapters.interfaces.rest.dto.response.StarForceDTO
+import com.example.algo.application.domain.enum.CubeType
+import com.example.algo.application.domain.enum.RareType
 import com.example.algo.application.domain.enum.StarForceEvent
 import com.example.algo.application.outbound.AlgoService
 import org.springframework.stereotype.Service
@@ -25,6 +28,7 @@ interface AlgoQueryService {
     fun getCharacter(name: String, boss: Int): List<CharacterResponse>
     fun getStarForceChance(req: Int, count: Int, step: Int, target: Int, destroy:Boolean, catch:Boolean, event: StarForceEvent): StarForceDTO
     fun getStarForceCost(req: Int, step: Int): BigDecimal
+    fun getCubeLevelUp(req: Int, cube: CubeType, count: Int, base: RareType, target: RareType, event: Boolean): CubeDTO
 }
 
 @Service
@@ -62,7 +66,7 @@ class AlgoQueryServiceImpl (
             while(stepValue != target) {
                 cost += calcEnforceValue(req, stepValue, destroy, event).toBigInteger()
                 //println("cost : $cost")
-                returnValue.EnforceCount++
+                returnValue.enforceCount++
                 //println("EnforceCount : " + returnValue.cost)
                 val mathValue = Math.random() * 100
                 var text = "mathValue : $mathValue\n"
@@ -144,7 +148,7 @@ class AlgoQueryServiceImpl (
         bwFile.close()
 
         return StarForceDTO(
-            returnValues.sumOf { it.EnforceCount }/count,
+            returnValues.sumOf { it.enforceCount }/count,
             format.format(costs.sumOf { it }.div(count.toBigInteger())),
             returnValues.sumOf { it.destroyCount }/count,
         )
@@ -152,6 +156,57 @@ class AlgoQueryServiceImpl (
 
     override fun getStarForceCost(req: Int, step: Int): BigDecimal {
         return calcEnforceValue(req, step, false, StarForceEvent.NONE).toBigDecimal()
+    }
+
+    override fun getCubeLevelUp(req: Int, cube: CubeType, count: Int, base: RareType, target: RareType, event: Boolean): CubeDTO {
+        val counts = mutableListOf<Int>()
+        val MASTER_CUBE = 4900000
+        val BLACK_CUBE = 22600000
+        val RED_CUBE = 12500000
+        val format = DecimalFormat("#,###")
+        for (i in 1 .. count) {
+            var stack = 0
+            var current = base
+            while(current != target) {
+                var prob = getCubeLevelUpProb(cube, current)
+                stack++
+                val mathValue = Math.random() * 100
+                if(mathValue <= prob) {
+                    current = when(current) {
+                        RareType.RARE -> {
+                            RareType.EPIC
+                        }
+
+                        RareType.EPIC -> {
+                            RareType.UNIQUE
+                        }
+
+                        else -> {
+                            RareType.LEGENDARY
+                        }
+                    }
+                }
+            }
+            counts.add(stack)
+        }
+        val cost = when(cube) {
+            CubeType.MASTER -> {
+                format.format(counts.average() * MASTER_CUBE + counts.average() * getCubeCost(req))
+            }
+
+            CubeType.RED -> {
+                format.format(counts.average() * RED_CUBE + counts.average() * getCubeCost(req))
+            }
+
+            CubeType.BLACK -> {
+                format.format(counts.average() * BLACK_CUBE + counts.average() * getCubeCost(req))
+            }
+
+            else -> {
+                ""
+            }
+        }
+        return CubeDTO(counts.average(), cost)
     }
 
     fun calcEnforceValue(req: Int, step: Int, destroy: Boolean, event: StarForceEvent): Int {
@@ -277,6 +332,131 @@ class AlgoQueryServiceImpl (
             }
             else-> {
                 39.6
+            }
+        }
+    }
+
+    fun getCubeLevelUpProb(cube: CubeType, base: RareType): Double {
+        return when(cube) {
+            CubeType.BLACK -> {
+                when (base) {
+                    RareType.RARE -> {
+                        15.0
+                    }
+
+                    RareType.EPIC -> {
+                        3.5
+                    }
+
+                    RareType.UNIQUE -> {
+                        1.2
+                    }
+                    else -> {
+                        0.0
+                    }
+                }
+            }
+
+            CubeType.RED -> {
+                when (base) {
+                    RareType.RARE -> {
+                        6.0
+                    }
+
+                    RareType.EPIC -> {
+                        1.8
+                    }
+
+                    RareType.UNIQUE -> {
+                        0.3
+                    }
+                    else -> {
+                        0.0
+                    }
+                }
+            }
+
+            CubeType.MASTER -> {
+                when (base) {
+                    RareType.RARE -> {
+                        4.7619
+                    }
+
+                    RareType.EPIC -> {
+                        1.1858
+                    }
+
+                    else -> {
+                        0.0
+                    }
+                }
+            }
+
+            CubeType.GM -> {
+                when (base) {
+                    RareType.RARE -> {
+                        7.9994
+                    }
+
+                    RareType.EPIC -> {
+                        1.6959
+                    }
+
+                    RareType.UNIQUE -> {
+                        0.1996
+                    }
+                    else -> {
+                        0.0
+                    }
+                }
+            }
+        }
+    }
+
+    fun getCubeCost(req: Int):Int {
+        return when(req) {
+            80 -> {
+                16000
+            }
+
+            90 -> {
+                20200
+            }
+
+            100 -> {
+                25000
+            }
+
+            110 -> {
+                30200
+            }
+
+            120 -> {
+                36000
+            }
+
+            130 -> {
+                338000
+            }
+
+            140 -> {
+                392000
+            }
+
+            150 -> {
+                450000
+            }
+
+            160 -> {
+                512000
+            }
+
+            200 -> {
+                800000
+            }
+
+            else -> {
+                0
             }
         }
     }
