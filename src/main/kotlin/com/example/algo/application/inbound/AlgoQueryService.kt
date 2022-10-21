@@ -26,7 +26,7 @@ interface AlgoQueryService {
     fun b1003()
     fun getCharacters(): List<CharacterResponse>
     fun getCharacter(name: String, boss: Int): List<CharacterResponse>
-    fun getStarForceChance(req: Int, count: Int, step: Int, target: Int, destroy:Boolean, catch:Boolean, event: StarForceEvent): StarForceDTO
+    fun getStarForceChance(req: Int, count: Int, step: Int, target: Int, destroy:Boolean, catch:Boolean, event: StarForceEvent, superior: Boolean): StarForceDTO
     fun getStarForceCost(req: Int, step: Int): BigDecimal
     fun getCubeLevelUp(req: Int, cube: CubeType, count: Int, base: RareType, target: RareType, event: Boolean): CubeDTO
 }
@@ -46,17 +46,19 @@ class AlgoQueryServiceImpl (
         return service.getCharacter(name, boss)
     }
 
-    override fun getStarForceChance(req: Int, count: Int, step: Int, target: Int, destroy:Boolean, catch:Boolean, event: StarForceEvent): StarForceDTO {
+    override fun getStarForceChance(req: Int, count: Int, step: Int, target: Int, destroy:Boolean, catch:Boolean, event: StarForceEvent, superior: Boolean): StarForceDTO {
         var returnValues = mutableListOf<StarForceDTO>()
         var costs = mutableListOf<BigInteger>()
         val format = DecimalFormat("#,###")
 
         val dateTime = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMddHHmmss"))
+        /*
         val home = System.getProperty("user.home")
         val path = "$home/Documents/test"
         val fileName = "Star Force Test__$dateTime.txt"
         val file = File(path, fileName)
         val bwFile = BufferedWriter(FileWriter(file))
+        */
 
         for(i in 1 .. count) {
             var stepValue = step
@@ -64,51 +66,63 @@ class AlgoQueryServiceImpl (
             var cost = BigInteger.ZERO
             var failedStack = 0
             while(stepValue != target) {
-                cost += calcEnforceValue(req, stepValue, destroy, event).toBigInteger()
+                cost += if(!superior) {
+                    calcEnforceValue(req, stepValue, destroy, event).toBigInteger()
+                } else {
+                    calcSuperiorEnforceValue(req, stepValue).toBigInteger()
+                }
                 //println("cost : $cost")
                 returnValue.enforceCount++
                 //println("EnforceCount : " + returnValue.cost)
                 val mathValue = Math.random() * 100
-                var text = "mathValue : $mathValue\n"
-                bwFile.write(text)
-                bwFile.flush()
+//                var text = "mathValue : $mathValue\n"
+//                bwFile.write(text)
+//                bwFile.flush()
                 //println("mathValue : " + returnValue.cost)
                 var successFlg: Int // 0 = 성공 1은 실패 2는 터짐
-                text = "probability : " + calcProbability(stepValue, catch, event) + "\n"
-                bwFile.write(text)
-                bwFile.flush()
-                var probValue = calcProbability(stepValue, catch, event)
+//                text = "probability : " + calcProbability(stepValue, catch, event) + "\n"
+//                bwFile.write(text)
+//                bwFile.flush()
+                var probValue = if(!superior) {
+                    calcProbability(stepValue, catch, event)
+                } else {
+                    calcSuperiorProbability(stepValue, catch)
+                }
+                var destroyValue = if(!superior)
+                    100-calcDestroy(stepValue, destroy)
+                else
+                    100-calcSuperiorDestroy(stepValue)
                 //println(probValue)
                 if (failedStack == 2){
                     successFlg = 0
-                    text = "$stepValue 에서 확정 강화 성공\n"
-                    bwFile.write(text)
-                    bwFile.flush()
+//                    text = "$stepValue 에서 확정 강화 성공\n"
+//                    bwFile.write(text)
+//                    bwFile.flush()
                 }
                 else if(mathValue < probValue) {
                     successFlg = 0
-                    text = "$stepValue 에서 강화 성공\n"
-                    bwFile.write(text)
-                    bwFile.flush()
-                } else if (mathValue > 100-calcDestroy(stepValue, destroy)) {
+//                    text = "$stepValue 에서 강화 성공\n"
+//                    bwFile.write(text)
+//                    bwFile.flush()
+                } else if (mathValue > destroyValue) {
                     successFlg = 2
                     returnValue.destroyCount++
-                    text = "$stepValue 에서 터짐\n"
-                    bwFile.write(text)
-                    bwFile.flush()
+//                    text = "$stepValue 에서 터짐\n"
+//                    bwFile.write(text)
+//                    bwFile.flush()
                     failedStack = 0
                     //println("************ 터짐 *************")
                 } else {
                     successFlg = 1
-                    text = "$stepValue 에서 실패\n"
-                    bwFile.write(text)
-                    bwFile.flush()
+//                    text = "$stepValue 에서 실패\n"
+//                    bwFile.write(text)
+//                    bwFile.flush()
                 }
 
                 when (successFlg) {
                     0 -> { // 성공시
                         failedStack = 0
-                        if(event == StarForceEvent.ONE_PLUS_ONE && stepValue <= 10)
+                        if(event == StarForceEvent.ONE_PLUS_ONE && stepValue <= 10 && !superior)
                             stepValue += 2
                         else
                             stepValue++
@@ -117,11 +131,21 @@ class AlgoQueryServiceImpl (
                     1 -> { // 실패시
                         when(stepValue) {
                             in 0..10 -> {
-                                stepValue
+                                if(!superior)
+                                    stepValue
+                                else {
+                                    stepValue--
+                                    failedStack++
+                                }
                             }
 
                             15, 20 -> {
-                                stepValue
+                                if(!superior)
+                                    stepValue
+                                else {
+                                    stepValue--
+                                    failedStack++
+                                }
                             }
 
                             else -> {
@@ -131,7 +155,10 @@ class AlgoQueryServiceImpl (
                         }
                     }
                     2 -> { // 터짐
-                        stepValue = 12
+                        stepValue = if(!superior)
+                            12
+                        else
+                            5
                         failedStack = 0
                     }
                 }
@@ -142,10 +169,10 @@ class AlgoQueryServiceImpl (
             returnValues.add(returnValue)
         }
 
-        var text = "Total Cost : " + format.format(costs.sumOf { it }.div(count.toBigInteger()))+ "\n"
+        /*var text = "Total Cost : " + format.format(costs.sumOf { it }.div(count.toBigInteger()))+ "\n"
         bwFile.write(text)
         bwFile.flush()
-        bwFile.close()
+        bwFile.close()*/
 
         return StarForceDTO(
             returnValues.sumOf { it.enforceCount }/count,
@@ -239,6 +266,22 @@ class AlgoQueryServiceImpl (
         }
     }
 
+    fun calcSuperiorEnforceValue(req: Int, step: Int): Int {
+        return when (req) {
+            80 -> {
+                5956000
+            }
+
+            110 -> {
+                18507900
+            }
+
+            else -> {
+                55382200
+            }
+        }
+    }
+
     fun calcProbability(step: Int, catch: Boolean, event: StarForceEvent): Double {
         val stepValue = step * 5
         val weight = if(catch) {
@@ -296,6 +339,47 @@ class AlgoQueryServiceImpl (
         }
     }
 
+    fun calcSuperiorProbability(step: Int, catch: Boolean): Double {
+        val weight = if(catch) {
+            1.05
+        } else {
+            1.0
+        }
+        return when (step) {
+            in 0..1 -> {
+                50.0 * weight
+            }
+
+            2 -> {
+                45.0 * weight
+            }
+
+            in 3..8 -> {
+                40.0 * weight
+            }
+
+            9 -> {
+                37.0 * weight
+            }
+
+            in 10..11 -> {
+                35.0 * weight
+            }
+
+            12 -> {
+                3.0 * weight
+            }
+
+            13 -> {
+                2.0 * weight
+            }
+
+            else -> {
+                1.0 * weight
+            }
+        }
+    }
+
     fun calcDestroy(step: Int, destroy: Boolean): Double {
         return when (step) {
             in 0..11 -> {
@@ -332,6 +416,44 @@ class AlgoQueryServiceImpl (
             }
             else-> {
                 39.6
+            }
+        }
+    }
+
+    fun calcSuperiorDestroy(step: Int): Double {
+        return when (step) {
+            in 0..4 -> {
+                0.0
+            }
+            5 -> {
+                1.8
+            }
+            6 -> {
+                3.0
+            }
+            7 -> {
+                4.2
+            }
+            8 -> {
+                6.0
+            }
+            9 -> {
+                9.5
+            }
+            10 -> {
+                13.0
+            }
+            11 -> {
+                16.3
+            }
+            12 -> {
+                48.5
+            }
+            13 -> {
+                49.0
+            }
+            else-> {
+                49.5
             }
         }
     }

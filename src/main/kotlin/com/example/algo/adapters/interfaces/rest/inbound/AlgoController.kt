@@ -65,12 +65,13 @@ class AlgoController(
         @RequestParam target: Int,
         @RequestParam destroy: Boolean,
         @RequestParam catch: Boolean,
+        @RequestParam superior: Boolean,
         @RequestParam(defaultValue = "NONE") event: StarForceEvent
     ) : ResponseEntity<StarForceDTO> {
         return ResponseEntity
             .ok()
             .contentType(MediaType.APPLICATION_JSON)
-            .body(query.getStarForceChance(req, count, step, target, destroy, catch, event))
+            .body(query.getStarForceChance(req, count, step, target, destroy, catch, event, superior))
     }
 
     @GetMapping(value= ["/star-force/cost"])
