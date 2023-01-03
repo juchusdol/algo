@@ -1,29 +1,29 @@
 package com.example.algo.adapters.interfaces.rest.dto.response
 
 data class Status(
-    val hp: Int = 0,
-    val mp: Int = 0,
-    val str: Int = 0,
-    val dex: Int = 0,
-    val int: Int = 0,
-    val luk: Int = 0,
+    var hp: Int = 0,
+    var mp: Int = 0,
+    var str: Int = 0,
+    var dex: Int = 0,
+    var int: Int = 0,
+    var luk: Int = 0,
 )
 
 data class Power(
-    val minimum: Int = 0,
-    val maximum: Int = 0,
+    var minimum: Int = 0,
+    var maximum: Int = 0,
 )
 
 data class Damage(
-    val normal: Int = 0,
-    val boss: Int = 0,
-    val critical: Int = 0,
-    val gongMa: Int = 0,
-    val bangMu: Double = 0.0,
+    var normal: Int = 0,
+    var boss: Int = 0,
+    var critical: Int = 0,
+    var gongMa: Int = 0,
+    var bangMu: Double = 0.0,
 )
 
 data class CharacterResponse (
-    val name: String = "",
+    var name: String = "",
     val status: Status,
     val power: Power,
     val damage: Damage,

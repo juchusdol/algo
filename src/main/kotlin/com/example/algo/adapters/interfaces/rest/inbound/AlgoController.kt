@@ -99,4 +99,23 @@ class AlgoController(
             .contentType(MediaType.APPLICATION_JSON)
             .body(query.getCubeLevelUp(req, cube, count, base, target, event))
     }
+
+    @GetMapping(value=["/enforce-value"])
+    fun getEnforceValue(
+        @RequestParam req: Int,
+        @RequestParam step: Int,
+    ) :ResponseEntity<List<CharacterResponse>> {
+        return ResponseEntity
+            .ok()
+            .contentType(MediaType.APPLICATION_JSON)
+            .body(query.getTest())
+    }
+
+    @GetMapping(value=["/test"])
+    fun getTest() :ResponseEntity<List<CharacterResponse>> {
+        return ResponseEntity
+            .ok()
+            .contentType(MediaType.APPLICATION_JSON)
+            .body(query.getTest())
+    }
 }

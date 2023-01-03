@@ -1,8 +1,6 @@
 package com.example.algo.application.inbound
 
-import com.example.algo.adapters.interfaces.rest.dto.response.CharacterResponse
-import com.example.algo.adapters.interfaces.rest.dto.response.CubeDTO
-import com.example.algo.adapters.interfaces.rest.dto.response.StarForceDTO
+import com.example.algo.adapters.interfaces.rest.dto.response.*
 import com.example.algo.application.domain.enum.CubeType
 import com.example.algo.application.domain.enum.RareType
 import com.example.algo.application.domain.enum.StarForceEvent
@@ -21,6 +19,7 @@ import java.text.DecimalFormat
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 import kotlin.math.pow
+import kotlin.math.roundToInt
 
 interface AlgoQueryService {
     fun b1003()
@@ -29,6 +28,7 @@ interface AlgoQueryService {
     fun getStarForceChance(req: Int, count: Int, step: Int, target: Int, destroy:Boolean, catch:Boolean, event: StarForceEvent, superior: Boolean): StarForceDTO
     fun getStarForceCost(req: Int, step: Int): BigDecimal
     fun getCubeLevelUp(req: Int, cube: CubeType, count: Int, base: RareType, target: RareType, event: Boolean): CubeDTO
+    fun getTest(): List<CharacterResponse>
 }
 
 @Service
@@ -51,8 +51,8 @@ class AlgoQueryServiceImpl (
         var costs = mutableListOf<BigInteger>()
         val format = DecimalFormat("#,###")
 
-        val dateTime = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMddHHmmss"))
         /*
+        val dateTime = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMddHHmmss"))
         val home = System.getProperty("user.home")
         val path = "$home/Documents/test"
         val fileName = "Star Force Test__$dateTime.txt"
@@ -130,21 +130,11 @@ class AlgoQueryServiceImpl (
 
                     1 -> { // 실패시
                         when(stepValue) {
-                            in 0..10 -> {
+                            in 0..15, 20 -> {
                                 if(!superior)
                                     stepValue
                                 else {
                                     stepValue--
-                                    failedStack++
-                                }
-                            }
-
-                            15, 20 -> {
-                                if(!superior)
-                                    stepValue
-                                else {
-                                    stepValue--
-                                    failedStack++
                                 }
                             }
 
@@ -174,9 +164,26 @@ class AlgoQueryServiceImpl (
         bwFile.flush()
         bwFile.close()*/
 
+        var avg = costs.sumOf { it }.div(count.toBigInteger())
+        var stDevs = mutableListOf<BigInteger>()
+
+        for(cost in costs) {
+            stDevs.add((cost-avg).pow(2))
+        }
+
+        var median = costs.sorted()[(count/2.0).roundToInt()]
+        var top = costs.sorted()[(count*0.1).roundToInt()]
+        var low = costs.sorted()[(count*0.9).roundToInt()]
+
+        var stDevAvg = stDevs.sumOf { it }.div(count.toBigInteger())
+
         return StarForceDTO(
             returnValues.sumOf { it.enforceCount }/count,
-            format.format(costs.sumOf { it }.div(count.toBigInteger())),
+            format.format(avg),
+            format.format(stDevAvg.sqrt()),
+            format.format(median),
+            format.format(top),
+            format.format(low),
             returnValues.sumOf { it.destroyCount }/count,
         )
     }
@@ -243,27 +250,46 @@ class AlgoQueryServiceImpl (
         val eventValue = if(event == StarForceEvent.DISCOUNT || event == StarForceEvent.SHINING) 0.7 else 1.0
         return when (step) {
             in 0..9 -> {
-                ((returnValue+reqValue*stepValue/25) * eventValue).toInt()
+                ((1000 + (returnValue+reqValue*stepValue/25)) * eventValue).toInt()
             }
 
-            in 10..11-> {
-                ((returnValue+reqValue*stepValue.pow(2.7)/400) * eventValue).toInt()
+            10 -> {
+                ((1000 + ((returnValue+reqValue*(stepValue.pow(2.7))/400))) * eventValue).toInt()
             }
 
-            in 12..14-> {
-                if(destroy) (returnValue+reqValue*stepValue.pow(2.7)/400 + (returnValue+reqValue*stepValue.pow(2.7)/400) * eventValue).toInt()
-                else ((returnValue+reqValue*stepValue.pow(2.7)/400) * eventValue).toInt()
+            11 -> {
+                ((1000 + ((returnValue+reqValue*(stepValue.pow(2.7))/220))) * eventValue).toInt()
+            }
+
+            12 -> {
+                ((1000 + ((returnValue+reqValue*(stepValue.pow(2.7))/150))) * eventValue).toInt()
+            }
+
+            13 -> {
+                ((1000 + ((returnValue+reqValue*(stepValue.pow(2.7))/110))) * eventValue).toInt()
+            }
+
+            14 -> {
+                ((1000 + ((returnValue+reqValue*(stepValue.pow(2.7))/75))) * eventValue).toInt()
             }
 
             in 15 .. 16 -> {
-                if(destroy) (returnValue+reqValue*stepValue.pow(2.7)/200 + (returnValue+reqValue*stepValue.pow(2.7)/200 * eventValue)).toInt()
-                else ((returnValue+reqValue*stepValue.pow(2.7)/200) * eventValue).toInt()
+                if(destroy) ((1000 + ((returnValue+reqValue*(stepValue.pow(2.7))/200))).toInt() + ((1000 + ((returnValue+reqValue*(stepValue.pow(2.7))/200))) * eventValue).toInt())
+                else ((1000 + ((returnValue+reqValue*(stepValue.pow(2.7))/200))) * eventValue).toInt()
             }
 
             else -> {
-                ((returnValue+reqValue*stepValue.pow(2.7)/200) * eventValue).toInt()
+                ((1000 + ((returnValue+reqValue*(stepValue.pow(2.7))/200))) * eventValue).toInt()
             }
         }
+    }
+
+    override fun getTest(): List<CharacterResponse> {
+        var res = CharacterResponse("", Status(), Power(), Damage())
+        var resList = mutableListOf<CharacterResponse>()
+        resList.add(res)
+        res.damage.bangMu = 40.0
+        return resList
     }
 
     fun calcSuperiorEnforceValue(req: Int, step: Int): Int {
@@ -382,17 +408,8 @@ class AlgoQueryServiceImpl (
 
     fun calcDestroy(step: Int, destroy: Boolean): Double {
         return when (step) {
-            in 0..11 -> {
+            in 0..14 -> {
                 0.0
-            }
-            12 -> {
-                if(destroy) 0.0 else 0.6
-            }
-            13 -> {
-                if(destroy) 0.0 else 1.3
-            }
-            14 -> {
-                if(destroy) 0.0 else 1.4
             }
             in 15..16 -> {
                 if(destroy) 0.0 else 2.1
