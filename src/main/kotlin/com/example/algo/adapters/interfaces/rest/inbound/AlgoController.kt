@@ -11,23 +11,18 @@ import com.example.algo.application.inbound.AlgoCommandService
 import com.example.algo.application.inbound.AlgoQueryService
 import org.springframework.http.MediaType
 import org.springframework.http.ResponseEntity
-import org.springframework.web.bind.annotation.GetMapping
-import org.springframework.web.bind.annotation.PostMapping
-import org.springframework.web.bind.annotation.RequestBody
-import org.springframework.web.bind.annotation.RequestMapping
-import org.springframework.web.bind.annotation.RequestParam
-import org.springframework.web.bind.annotation.RestController
+import org.springframework.web.bind.annotation.*
 import org.springframework.web.util.UriComponentsBuilder
 import java.math.BigDecimal
 
-@RequestMapping(value=["/algo"])
+@RequestMapping(value = ["/algo"])
 @RestController
 class AlgoController(
     private val query: AlgoQueryService,
     private val command: AlgoCommandService,
 ) {
     @PostMapping
-    fun insertCharacter(@RequestBody dto: CharacterRequest):ResponseEntity<Void> {
+    fun insertCharacter(@RequestBody dto: CharacterRequest): ResponseEntity<Void> {
         val name = command.insertCharacter(dto)
 
         val uriComponents = UriComponentsBuilder
@@ -42,7 +37,7 @@ class AlgoController(
     }
 
     @GetMapping
-    fun getCharacters():ResponseEntity<List<CharacterResponse>> {
+    fun getCharacters(): ResponseEntity<List<CharacterResponse>> {
         return ResponseEntity
             .ok()
             .contentType(MediaType.APPLICATION_JSON)
@@ -50,14 +45,14 @@ class AlgoController(
     }
 
     @GetMapping(value = ["/all"])
-    fun getCharacter(@RequestParam name: String, @RequestParam boss: Int):ResponseEntity<List<CharacterResponse>> {
+    fun getCharacter(@RequestParam name: String, @RequestParam boss: Int): ResponseEntity<List<CharacterResponse>> {
         return ResponseEntity
             .ok()
             .contentType(MediaType.APPLICATION_JSON)
             .body(query.getCharacter(name, boss))
     }
 
-    @GetMapping(value= ["/star-force"])
+    @GetMapping(value = ["/star-force"])
     fun getStarForceChance(
         @RequestParam req: Int,
         @RequestParam count: Int,
@@ -67,25 +62,25 @@ class AlgoController(
         @RequestParam catch: Boolean,
         @RequestParam superior: Boolean,
         @RequestParam(defaultValue = "NONE") event: StarForceEvent
-    ) : ResponseEntity<StarForceDTO> {
+    ): ResponseEntity<StarForceDTO> {
         return ResponseEntity
             .ok()
             .contentType(MediaType.APPLICATION_JSON)
             .body(query.getStarForceChance(req, count, step, target, destroy, catch, event, superior))
     }
 
-    @GetMapping(value= ["/star-force/cost"])
+    @GetMapping(value = ["/star-force/cost"])
     fun getStarForceChance(
         @RequestParam req: Int,
         @RequestParam step: Int
-    ) : ResponseEntity<BigDecimal> {
+    ): ResponseEntity<BigDecimal> {
         return ResponseEntity
             .ok()
             .contentType(MediaType.APPLICATION_JSON)
             .body(query.getStarForceCost(req, step))
     }
 
-    @GetMapping(value= ["/cube/level-up"])
+    @GetMapping(value = ["/cube/level-up"])
     fun getCubeLevelUp(
         @RequestParam cube: CubeType,
         @RequestParam count: Int,
@@ -93,26 +88,26 @@ class AlgoController(
         @RequestParam base: RareType,
         @RequestParam target: RareType,
         @RequestParam event: Boolean
-    ) : ResponseEntity<CubeDTO> {
+    ): ResponseEntity<CubeDTO> {
         return ResponseEntity
             .ok()
             .contentType(MediaType.APPLICATION_JSON)
             .body(query.getCubeLevelUp(req, cube, count, base, target, event))
     }
 
-    @GetMapping(value=["/enforce-value"])
+    @GetMapping(value = ["/enforce-value"])
     fun getEnforceValue(
         @RequestParam req: Int,
         @RequestParam step: Int,
-    ) :ResponseEntity<List<CharacterResponse>> {
+    ): ResponseEntity<List<CharacterResponse>> {
         return ResponseEntity
             .ok()
             .contentType(MediaType.APPLICATION_JSON)
             .body(query.getTest())
     }
 
-    @GetMapping(value=["/test"])
-    fun getTest() :ResponseEntity<List<CharacterResponse>> {
+    @GetMapping(value = ["/test"])
+    fun getTest(): ResponseEntity<List<CharacterResponse>> {
         return ResponseEntity
             .ok()
             .contentType(MediaType.APPLICATION_JSON)
