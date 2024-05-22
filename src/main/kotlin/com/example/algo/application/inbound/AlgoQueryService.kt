@@ -1,10 +1,13 @@
 package com.example.algo.application.inbound
 
 import com.example.algo.adapters.interfaces.rest.dto.response.*
+import com.example.algo.application.client.NeopleClient
 import com.example.algo.application.domain.enum.CubeType
 import com.example.algo.application.domain.enum.RareType
 import com.example.algo.application.domain.enum.StarForceEvent
 import com.example.algo.application.outbound.AlgoService
+import com.example.algo.application.outbound.dto.*
+import org.springframework.beans.factory.annotation.Value
 import org.springframework.stereotype.Service
 import java.math.BigDecimal
 import java.math.BigInteger
@@ -20,12 +23,53 @@ interface AlgoQueryService {
     fun getStarForceCost(req: Int, step: Int): BigDecimal
     fun getCubeLevelUp(req: Int, cube: CubeType, count: Int, base: RareType, target: RareType, event: Boolean): CubeDTO
     fun getTest(): List<CharacterResponse>
+    fun getServers(): DFBody<ServerInfo>
+    fun getCharacters(serverId: String, characterName: String): DFBody<CharacterInfo>
+    fun getCharacter(serverId: String, characterId: String): CharacterBaseInfo
+    fun getCharacterTimeLine(serverId: String, characterId: String): CharacterTimeLine
 }
 
 @Service
 class AlgoQueryServiceImpl (
-    val service: AlgoService
+    val service: AlgoService,
+    val neopleClient: NeopleClient
         ) : AlgoQueryService {
+
+    @Value("\${api.keys.neople}")
+    lateinit var apiKey: String
+
+    override fun getServers(): DFBody<ServerInfo> {
+        val value = neopleClient.getServers(apiKey)
+        return value.body ?: throw RuntimeException()
+    }
+
+    override fun getCharacters(serverId: String, characterName: String): DFBody<CharacterInfo> {
+        return neopleClient.getCharacters(
+            apikey = apiKey,
+            serverId = serverId,
+            characterName = characterName,
+            wordType = "full"
+            ).body ?: throw RuntimeException()
+    }
+
+    override fun getCharacter(serverId: String, characterId: String): CharacterBaseInfo {
+        return neopleClient.getCharacterInfo(
+            apikey = apiKey,
+            serverId = serverId,
+            characterId = characterId
+        ).body ?: throw RuntimeException()
+    }
+
+    override fun getCharacterTimeLine(serverId: String, characterId: String): CharacterTimeLine {
+        return neopleClient.getCharacterTimeLine(
+            apikey = apiKey,
+            serverId = serverId,
+            characterId = characterId,
+            code = 505,
+            limit = 100
+        ).body ?: throw RuntimeException()
+    }
+
     override fun b1003() {
     }
 

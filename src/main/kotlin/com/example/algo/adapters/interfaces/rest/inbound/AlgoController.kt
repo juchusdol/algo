@@ -9,6 +9,7 @@ import com.example.algo.application.domain.enum.RareType
 import com.example.algo.application.domain.enum.StarForceEvent
 import com.example.algo.application.inbound.AlgoCommandService
 import com.example.algo.application.inbound.AlgoQueryService
+import com.example.algo.application.outbound.dto.*
 import org.springframework.http.MediaType
 import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.*
@@ -112,5 +113,61 @@ class AlgoController(
             .ok()
             .contentType(MediaType.APPLICATION_JSON)
             .body(query.getTest())
+    }
+
+    @GetMapping("/server/info")
+    fun getServerInfo(): ResponseEntity<DFBody<ServerInfo>> {
+        /*
+        var body = service.getServers();
+        for (ServerInfo info : body.getRows()) {
+            logger.info(info.getServerName());
+        }*/
+        val value = query.getServers()
+        return ResponseEntity
+            .ok()
+            .contentType(MediaType.APPLICATION_JSON)
+            .body(value)
+    }
+
+    @GetMapping("/server/{serverId}/characters")
+    fun getCharacters(
+        @PathVariable serverId: String,
+        @RequestParam characterName: String
+    ): ResponseEntity<DFBody<CharacterInfo>> {
+        return ResponseEntity
+            .ok()
+            .contentType(MediaType.APPLICATION_JSON)
+            .body(query.getCharacters(
+                serverId = serverId,
+                characterName = characterName
+            ))
+    }
+
+    @GetMapping("/server/{serverId}/characters/{characterId}")
+    fun getCharacter(
+        @PathVariable serverId: String,
+        @PathVariable characterId: String
+    ): ResponseEntity<CharacterBaseInfo> {
+        return ResponseEntity
+            .ok()
+            .contentType(MediaType.APPLICATION_JSON)
+            .body(query.getCharacter(
+                serverId = serverId,
+                characterId = characterId
+            ))
+    }
+
+    @GetMapping("/server/{serverId}/characters/{characterId}/time-line")
+    fun getCharacterTimeLine(
+        @PathVariable serverId: String,
+        @PathVariable characterId: String
+    ): ResponseEntity<CharacterTimeLine> {
+        return ResponseEntity
+            .ok()
+            .contentType(MediaType.APPLICATION_JSON)
+            .body(query.getCharacterTimeLine(
+                serverId = serverId,
+                characterId = characterId
+            ))
     }
 }

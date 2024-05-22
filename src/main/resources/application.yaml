@@ -24,3 +24,8 @@ management:
     web:
       exposure:
         include: refresh, info, keepalive, health, metrics
+api:
+  keys:
+    neople: '2ChSroGB6E2BGo8GyXfX6g6UiA6JawFP'
+domains:
+  neople: 'https://api.neople.co.kr/df'
