@@ -11,5 +11,5 @@ import java.io.Serializable
 @Getter
 @Setter
 data class DFBody<T>(
-    private val row : List<T> = mutableListOf(),
+    private var rows : List<T> = mutableListOf(),
 ) : Serializable
