@@ -147,7 +147,7 @@ class AlgoController(
     fun getCharacter(
         @PathVariable serverId: String,
         @PathVariable characterId: String
-    ): ResponseEntity<CharacterBaseInfo> {
+    ): ResponseEntity<CharacterBase> {
         return ResponseEntity
             .ok()
             .contentType(MediaType.APPLICATION_JSON)

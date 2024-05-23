@@ -1,22 +1,15 @@
 package com.example.algo.application.outbound.dto
 
-import lombok.AllArgsConstructor
-import lombok.Getter
-import lombok.Setter
 
-@AllArgsConstructor
-@Getter
-@Setter
-interface CharacterBaseInfo {
-    val characterId: String
-    val characterName: String
-    val level: Int
-    val jobId: String
-    val jobGrowId: String
-    val jobName: String
-    val jobGrowName: String
-    val adventureName: String
-    val guildId: String
-    val guildName: String
-}
-
+data class CharacterBaseInfo(
+    override var characterId: String,
+    override var characterName: String,
+    override var level: Int,
+    override var jobId: String,
+    override var jobGrowId: String,
+    override var jobName: String,
+    override var jobGrowName: String,
+    var adventureName: String,
+    var guildId: String,
+    var guildName: String,
+): CharacterBase

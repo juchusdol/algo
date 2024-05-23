@@ -25,7 +25,7 @@ interface AlgoQueryService {
     fun getTest(): List<CharacterResponse>
     fun getServers(): DFBody<ServerInfo>
     fun getCharacters(serverId: String, characterName: String): DFBody<CharacterInfo>
-    fun getCharacter(serverId: String, characterId: String): CharacterBaseInfo
+    fun getCharacter(serverId: String, characterId: String): CharacterBase
     fun getCharacterTimeLine(serverId: String, characterId: String): CharacterTimeLine
 }
 
@@ -40,7 +40,7 @@ class AlgoQueryServiceImpl (
 
     override fun getServers(): DFBody<ServerInfo> {
         val value = neopleClient.getServers(apiKey)
-        return value.body ?: throw RuntimeException()
+        return value.body ?: throw RuntimeException("Server not found")
     }
 
     override fun getCharacters(serverId: String, characterName: String): DFBody<CharacterInfo> {
@@ -52,7 +52,7 @@ class AlgoQueryServiceImpl (
             ).body ?: throw RuntimeException()
     }
 
-    override fun getCharacter(serverId: String, characterId: String): CharacterBaseInfo {
+    override fun getCharacter(serverId: String, characterId: String): CharacterBase {
         return neopleClient.getCharacterInfo(
             apikey = apiKey,
             serverId = serverId,
