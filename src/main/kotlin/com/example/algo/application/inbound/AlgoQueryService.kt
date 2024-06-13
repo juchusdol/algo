@@ -19,7 +19,17 @@ interface AlgoQueryService {
     fun b1003()
     fun getCharacters(): List<CharacterResponse>
     fun getCharacter(name: String, boss: Int): List<CharacterResponse>
-    fun getStarForceChance(req: Int, count: Int, step: Int, target: Int, destroy:Boolean, catch:Boolean, event: StarForceEvent, superior: Boolean): StarForceDTO
+    fun getStarForceChance(
+        req: Int,
+        count: Int,
+        step: Int,
+        target: Int,
+        destroy: Boolean,
+        catch: Boolean,
+        event: StarForceEvent,
+        superior: Boolean
+    ): StarForceDTO
+
     fun getStarForceCost(req: Int, step: Int): BigDecimal
     fun getCubeLevelUp(req: Int, cube: CubeType, count: Int, base: RareType, target: RareType, event: Boolean): CubeDTO
     fun getTest(): List<CharacterResponse>
@@ -27,13 +37,15 @@ interface AlgoQueryService {
     fun getCharacters(serverId: String, characterName: String): DFBody<CharacterInfo>
     fun getCharacter(serverId: String, characterId: String): CharacterBase
     fun getCharacterTimeLine(serverId: String, characterId: String): CharacterTimeLine
+    fun getAmplificationValue(count: Int, step: Int, target: Int, safety: Boolean, weapon: Boolean, crystalPrice: Int): AmplificationDTO
+    fun getAmplificationValueByTicket(count: Int, base: BigInteger, probability: Int): AmplificationDTO
 }
 
 @Service
-class AlgoQueryServiceImpl (
+class AlgoQueryServiceImpl(
     val service: AlgoService,
     val neopleClient: NeopleClient
-        ) : AlgoQueryService {
+) : AlgoQueryService {
 
     @Value("\${api.keys.neople}")
     lateinit var apiKey: String
@@ -49,7 +61,7 @@ class AlgoQueryServiceImpl (
             serverId = serverId,
             characterName = characterName,
             wordType = "full"
-            ).body ?: throw RuntimeException()
+        ).body ?: throw RuntimeException()
     }
 
     override fun getCharacter(serverId: String, characterId: String): CharacterBase {
@@ -70,6 +82,151 @@ class AlgoQueryServiceImpl (
         ).body ?: throw RuntimeException()
     }
 
+    override fun getAmplificationValue(
+        count: Int,
+        step: Int,
+        target: Int,
+        safety: Boolean,
+        weapon: Boolean,
+        crystalPrice: Int
+    ): AmplificationDTO {
+        val returnValues = mutableListOf<AmplificationDTO>()
+        val costs = mutableListOf<BigInteger>()
+        val format = DecimalFormat("#,###")
+
+        for (i in 1..count) {
+            var stepValue = step
+            val returnValue = AmplificationDTO()
+            var cost = BigInteger.ZERO
+            var crystal = 0
+            var failedStack = 0
+            var failCount = 0
+            var destroyedCount = 0
+
+            while (stepValue != target) {
+                cost += if (safety)
+                    calcSafetyAmplificationValue(stepValue, weapon).toBigInteger()
+                else
+                    calcAmplificationValue(weapon).toBigInteger()
+                crystal += if(safety)
+                    calcHarmonyValue(stepValue, weapon)
+                else
+                    calcContradictionValue(stepValue)
+                returnValue.amplificationCount++
+                val mathValue = Math.random() * 100
+                val probValue = if(safety) calcSafetyAmplificationProbability(stepValue, failedStack)
+                else calcAmplificationProbability(stepValue)
+
+                if (mathValue < probValue) {
+                    stepValue++
+                    failedStack = 0
+
+                } else {
+                    failCount++
+                    if(safety)
+                        failedStack++
+                    else
+                        when(stepValue) {
+                            in 4 .. 6 -> stepValue--
+                            7 -> stepValue = 4
+                            8 -> stepValue = 5
+                            9 -> stepValue = 7
+                            in 10 .. 12 -> {
+                                stepValue = 0
+                                destroyedCount++
+                            }
+                        }
+                }
+            }
+            costs.add(cost)
+            returnValue.cost = format.format(cost)
+            returnValue.crystal = crystal.toString()
+            returnValue.failCount = failCount.toDouble()
+            returnValue.destroyedCount = destroyedCount.toDouble()
+            returnValues.add(returnValue)
+        }
+
+        val avg = costs.sumOf { it }.div(count.toBigInteger())
+        val stDevs = mutableListOf<BigInteger>()
+
+        for (cost in costs) {
+            stDevs.add((cost - avg).pow(2))
+        }
+
+        val median = costs.sorted()[(count / 2.0).roundToInt()]
+        val top = costs.sorted()[(count * 0.1).roundToInt()]
+        val low = costs.sorted()[(count * 0.9).roundToInt()]
+
+        val stDevAvg = stDevs.sumOf { it }.div(count.toBigInteger())
+
+        val crystal = returnValues.sumOf { it.crystal.toDouble() } / count
+        val price = if(safety) crystal * crystalPrice else crystal * crystalPrice * 1000
+
+        return AmplificationDTO(
+            returnValues.sumOf { it.amplificationCount } / count,
+            format.format(avg),
+            format.format(crystal),
+            format.format(stDevAvg.sqrt()),
+            format.format(median),
+            format.format(top),
+            format.format(low),
+            returnValues.sumOf { it.failCount } / count,
+            returnValues.sumOf { it.destroyedCount } / count,
+            format.format(price)
+        )
+    }
+
+    override fun getAmplificationValueByTicket(count: Int, base: BigInteger, probability: Int): AmplificationDTO {
+        val returnValues = mutableListOf<AmplificationDTO>()
+        val costs = mutableListOf<BigInteger>()
+        val format = DecimalFormat("#,###")
+
+        for (i in 1..count) {
+            var successFlg = false
+            val returnValue = AmplificationDTO()
+            var cost = BigInteger.ZERO
+            var failCount = 0
+            while (!successFlg) {
+                cost += base
+                val mathValue = Math.random() * 100
+
+                if (mathValue < probability) {
+                    successFlg = true
+                } else {
+                    failCount++
+                }
+            }
+            costs.add(cost)
+            returnValue.cost = format.format(cost)
+            returnValue.failCount = failCount.toDouble()
+            returnValues.add(returnValue)
+        }
+
+        val avg = costs.sumOf { it }.div(count.toBigInteger())
+        val stDevs = mutableListOf<BigInteger>()
+
+        for (cost in costs) {
+            stDevs.add((cost - avg).pow(2))
+        }
+
+        val median = costs.sorted()[(count / 2.0).roundToInt()]
+        val top = costs.sorted()[(count * 0.1).roundToInt()]
+        val low = costs.sorted()[(count * 0.9).roundToInt()]
+
+        val stDevAvg = stDevs.sumOf { it }.div(count.toBigInteger())
+
+        return AmplificationDTO(
+            returnValues.sumOf { it.amplificationCount } / count,
+            format.format(avg),
+            "0",
+            format.format(stDevAvg.sqrt()),
+            format.format(median),
+            format.format(top),
+            format.format(low),
+            returnValues.sumOf { it.failCount } / count,
+        )
+    }
+
     override fun b1003() {
     }
 
@@ -81,7 +238,16 @@ class AlgoQueryServiceImpl (
         return service.getCharacter(name, boss)
     }
 
-    override fun getStarForceChance(req: Int, count: Int, step: Int, target: Int, destroy:Boolean, catch:Boolean, event: StarForceEvent, superior: Boolean): StarForceDTO {
+    override fun getStarForceChance(
+        req: Int,
+        count: Int,
+        step: Int,
+        target: Int,
+        destroy: Boolean,
+        catch: Boolean,
+        event: StarForceEvent,
+        superior: Boolean
+    ): StarForceDTO {
         var returnValues = mutableListOf<StarForceDTO>()
         var costs = mutableListOf<BigInteger>()
         val format = DecimalFormat("#,###")
@@ -95,13 +261,13 @@ class AlgoQueryServiceImpl (
         val bwFile = BufferedWriter(FileWriter(file))
         */
 
-        for(i in 1 .. count) {
+        for (i in 1..count) {
             var stepValue = step
-            var returnValue = StarForceDTO()
+            val returnValue = StarForceDTO()
             var cost = BigInteger.ZERO
             var failedStack = 0
-            while(stepValue != target) {
-                cost += if(!superior) {
+            while (stepValue != target) {
+                cost += if (!superior) {
                     calcEnforceValue(req, stepValue, destroy, event).toBigInteger()
                 } else {
                     calcSuperiorEnforceValue(req, stepValue).toBigInteger()
@@ -118,23 +284,22 @@ class AlgoQueryServiceImpl (
 //                text = "probability : " + calcProbability(stepValue, catch, event) + "\n"
 //                bwFile.write(text)
 //                bwFile.flush()
-                var probValue = if(!superior) {
+                var probValue = if (!superior) {
                     calcProbability(stepValue, catch, event)
                 } else {
                     calcSuperiorProbability(stepValue, catch)
                 }
-                var destroyValue = if(!superior)
-                    100-calcDestroy(stepValue, destroy)
+                var destroyValue = if (!superior)
+                    100 - calcDestroy(stepValue, destroy)
                 else
-                    100-calcSuperiorDestroy(stepValue)
+                    100 - calcSuperiorDestroy(stepValue)
                 //println(probValue)
-                if (failedStack == 2){
+                if (failedStack == 2) {
                     successFlg = 0
 //                    text = "$stepValue 에서 확정 강화 성공\n"
 //                    bwFile.write(text)
 //                    bwFile.flush()
-                }
-                else if(mathValue < probValue) {
+                } else if (mathValue < probValue) {
                     successFlg = 0
 //                    text = "$stepValue 에서 강화 성공\n"
 //                    bwFile.write(text)
@@ -157,16 +322,16 @@ class AlgoQueryServiceImpl (
                 when (successFlg) {
                     0 -> { // 성공시
                         failedStack = 0
-                        if(event == StarForceEvent.ONE_PLUS_ONE && stepValue <= 10 && !superior)
+                        if (event == StarForceEvent.ONE_PLUS_ONE && stepValue <= 10 && !superior)
                             stepValue += 2
                         else
                             stepValue++
                     }
 
                     1 -> { // 실패시
-                        when(stepValue) {
+                        when (stepValue) {
                             in 0..15, 20 -> {
-                                if(!superior)
+                                if (!superior)
                                     stepValue
                                 else {
                                     stepValue--
@@ -179,8 +344,9 @@ class AlgoQueryServiceImpl (
                             }
                         }
                     }
+
                     2 -> { // 터짐
-                        stepValue = if(!superior)
+                        stepValue = if (!superior)
                             12
                         else
                             5
@@ -202,24 +368,24 @@ class AlgoQueryServiceImpl (
         var avg = costs.sumOf { it }.div(count.toBigInteger())
         var stDevs = mutableListOf<BigInteger>()
 
-        for(cost in costs) {
-            stDevs.add((cost-avg).pow(2))
+        for (cost in costs) {
+            stDevs.add((cost - avg).pow(2))
         }
 
-        var median = costs.sorted()[(count/2.0).roundToInt()]
-        var top = costs.sorted()[(count*0.1).roundToInt()]
-        var low = costs.sorted()[(count*0.9).roundToInt()]
+        var median = costs.sorted()[(count / 2.0).roundToInt()]
+        var top = costs.sorted()[(count * 0.1).roundToInt()]
+        var low = costs.sorted()[(count * 0.9).roundToInt()]
 
         var stDevAvg = stDevs.sumOf { it }.div(count.toBigInteger())
 
         return StarForceDTO(
-            returnValues.sumOf { it.enforceCount }/count,
+            returnValues.sumOf { it.enforceCount } / count,
             format.format(avg),
             format.format(stDevAvg.sqrt()),
             format.format(median),
             format.format(top),
             format.format(low),
-            returnValues.sumOf { it.destroyCount }/count,
+            returnValues.sumOf { it.destroyCount } / count,
         )
     }
 
@@ -227,21 +393,28 @@ class AlgoQueryServiceImpl (
         return calcEnforceValue(req, step, false, StarForceEvent.NONE).toBigDecimal()
     }
 
-    override fun getCubeLevelUp(req: Int, cube: CubeType, count: Int, base: RareType, target: RareType, event: Boolean): CubeDTO {
+    override fun getCubeLevelUp(
+        req: Int,
+        cube: CubeType,
+        count: Int,
+        base: RareType,
+        target: RareType,
+        event: Boolean
+    ): CubeDTO {
         val counts = mutableListOf<Int>()
         val MASTER_CUBE = 4900000
         val BLACK_CUBE = 22600000
         val RED_CUBE = 12500000
         val format = DecimalFormat("#,###")
-        for (i in 1 .. count) {
+        for (i in 1..count) {
             var stack = 0
             var current = base
-            while(current != target) {
+            while (current != target) {
                 var prob = getCubeLevelUpProb(cube, current)
                 stack++
                 val mathValue = Math.random() * 100
-                if(mathValue <= prob) {
-                    current = when(current) {
+                if (mathValue <= prob) {
+                    current = when (current) {
                         RareType.RARE -> {
                             RareType.EPIC
                         }
@@ -258,7 +431,7 @@ class AlgoQueryServiceImpl (
             }
             counts.add(stack)
         }
-        val cost = when(cube) {
+        val cost = when (cube) {
             CubeType.MASTER -> {
                 format.format(counts.average() * MASTER_CUBE + counts.average() * getCubeCost(req))
             }
@@ -278,43 +451,169 @@ class AlgoQueryServiceImpl (
         return CubeDTO(counts.average(), cost)
     }
 
+    fun calcAmplificationValue(weapon: Boolean): Int {
+        return if (weapon) {
+            739200
+        } else {
+            258720
+        }
+    }
+
+    fun calcSafetyAmplificationValue(step: Int, weapon: Boolean): Int {
+        return if (weapon) {
+            when (step) {
+                0 -> 430100
+                1 -> 490600
+                2 -> 551100
+                3 -> 611600
+                4 -> 876652
+                5 -> 1072098
+                6 -> 1730400
+                7 -> 1932679
+                8 -> 3656400
+                9 -> 5084870
+                else -> 0
+            }
+        } else {
+            when (step) {
+                0 -> 189860
+                1 -> 250360
+                2 -> 310860
+                3 -> 371360
+                4 -> 490750
+                5 -> 615450
+                6 -> 1043132
+                7 -> 1167283
+                8 -> 2246200
+                9 -> 2937440
+                else -> 0
+            }
+        }
+    }
+
+    fun calcContradictionValue(step: Int): Int {
+        return when (step) {
+            0 -> 1
+            1 -> 2
+            2 -> 3
+            3 -> 4
+            4 -> 5
+            5 -> 6
+            6 -> 7
+            7 -> 8
+            8 -> 9
+            9 -> 10
+            10 -> 11
+            11 -> 12
+            12 -> 13
+            else -> 0
+        }
+    }
+
+    fun calcHarmonyValue(step: Int, weapon: Boolean): Int {
+        return if (weapon) {
+            when (step) {
+                0 -> 36
+                1 -> 41
+                2 -> 46
+                3 -> 51
+                4 -> 55
+                5 -> 67
+                6 -> 109
+                7 -> 122
+                8 -> 230
+                9 -> 320
+                else -> 0
+            }
+        } else {
+            when (step) {
+                0 -> 16
+                1 -> 21
+                2 -> 26
+                3 -> 31
+                4 -> 46
+                5 -> 58
+                6 -> 98
+                7 -> 109
+                8 -> 212
+                9 -> 277
+                else -> 0
+            }
+        }
+    }
+
+    fun calcSafetyAmplificationProbability(step: Int, weight: Int): Int {
+        return when (step) {
+            in 0..3 -> {
+                100
+            }
+
+            4 -> 70 + weight * 10
+            5 -> 60 + weight * 10
+            6 -> 50 + weight * 10
+            7 -> 50 + weight * 5
+            8 -> 40 + weight * 5
+            9 -> 30 + weight * 5
+            else -> 0
+        }
+    }
+
+    fun calcAmplificationProbability(step:Int): Int {
+        return when(step) {
+            in 0 .. 3 -> 100
+            4 -> 80
+            5 -> 70
+            6 -> 60
+            7 -> 70
+            8 -> 60
+            9 -> 50
+            10 -> 40
+            11 -> 30
+            12 -> 20
+            else -> 0
+        }
+    }
+
+
     fun calcEnforceValue(req: Int, step: Int, destroy: Boolean, event: StarForceEvent): Int {
         var returnValue = 1000
-        val reqValue = req*req*req
-        val stepValue: Double = (step+1).toDouble()
-        val eventValue = if(event == StarForceEvent.DISCOUNT || event == StarForceEvent.SHINING) 0.7 else 1.0
+        val reqValue = req * req * req
+        val stepValue: Double = (step + 1).toDouble()
+        val eventValue = if (event == StarForceEvent.DISCOUNT || event == StarForceEvent.SHINING) 0.7 else 1.0
         return when (step) {
             in 0..9 -> {
-                ((1000 + (returnValue+reqValue*stepValue/25)) * eventValue).toInt()
+                ((1000 + (returnValue + reqValue * stepValue / 25)) * eventValue).toInt()
             }
 
             10 -> {
-                ((1000 + ((returnValue+reqValue*(stepValue.pow(2.7))/400))) * eventValue).toInt()
+                ((1000 + ((returnValue + reqValue * (stepValue.pow(2.7)) / 400))) * eventValue).toInt()
             }
 
             11 -> {
-                ((1000 + ((returnValue+reqValue*(stepValue.pow(2.7))/220))) * eventValue).toInt()
+                ((1000 + ((returnValue + reqValue * (stepValue.pow(2.7)) / 220))) * eventValue).toInt()
             }
 
             12 -> {
-                ((1000 + ((returnValue+reqValue*(stepValue.pow(2.7))/150))) * eventValue).toInt()
+                ((1000 + ((returnValue + reqValue * (stepValue.pow(2.7)) / 150))) * eventValue).toInt()
             }
 
             13 -> {
-                ((1000 + ((returnValue+reqValue*(stepValue.pow(2.7))/110))) * eventValue).toInt()
+                ((1000 + ((returnValue + reqValue * (stepValue.pow(2.7)) / 110))) * eventValue).toInt()
             }
 
             14 -> {
-                ((1000 + ((returnValue+reqValue*(stepValue.pow(2.7))/75))) * eventValue).toInt()
+                ((1000 + ((returnValue + reqValue * (stepValue.pow(2.7)) / 75))) * eventValue).toInt()
             }
 
-            in 15 .. 16 -> {
-                if(destroy) ((1000 + ((returnValue+reqValue*(stepValue.pow(2.7))/200))).toInt() + ((1000 + ((returnValue+reqValue*(stepValue.pow(2.7))/200))) * eventValue).toInt())
-                else ((1000 + ((returnValue+reqValue*(stepValue.pow(2.7))/200))) * eventValue).toInt()
+            in 15..16 -> {
+                if (destroy) ((1000 + ((returnValue + reqValue * (stepValue.pow(2.7)) / 200))).toInt() + ((1000 + ((returnValue + reqValue * (stepValue.pow(
+                    2.7
+                )) / 200))) * eventValue).toInt())
+                else ((1000 + ((returnValue + reqValue * (stepValue.pow(2.7)) / 200))) * eventValue).toInt()
             }
 
             else -> {
-                ((1000 + ((returnValue+reqValue*(stepValue.pow(2.7))/200))) * eventValue).toInt()
+                ((1000 + ((returnValue + reqValue * (stepValue.pow(2.7)) / 200))) * eventValue).toInt()
             }
         }
     }
@@ -345,7 +644,7 @@ class AlgoQueryServiceImpl (
 
     fun calcProbability(step: Int, catch: Boolean, event: StarForceEvent): Double {
         val stepValue = step * 5
-        val weight = if(catch) {
+        val weight = if (catch) {
             1.05
         } else {
             1.0
@@ -360,7 +659,7 @@ class AlgoQueryServiceImpl (
             }
 
             5 -> {
-                if(event == StarForceEvent.SUCCESS || event == StarForceEvent.SHINING) 100.0
+                if (event == StarForceEvent.SUCCESS || event == StarForceEvent.SHINING) 100.0
                 else (100.0 - stepValue) * weight
             }
 
@@ -369,7 +668,7 @@ class AlgoQueryServiceImpl (
             }
 
             10 -> {
-                if(event == StarForceEvent.SUCCESS || event == StarForceEvent.SHINING) 100.0
+                if (event == StarForceEvent.SUCCESS || event == StarForceEvent.SHINING) 100.0
                 else (100.0 - stepValue) * weight
             }
 
@@ -378,11 +677,11 @@ class AlgoQueryServiceImpl (
             }
 
             15 -> {
-                if(event == StarForceEvent.SUCCESS || event == StarForceEvent.SHINING) 100.0
+                if (event == StarForceEvent.SUCCESS || event == StarForceEvent.SHINING) 100.0
                 else 30.0 * weight
             }
 
-            in 16.. 21 -> {
+            in 16..21 -> {
                 30.0 * weight
             }
 
@@ -401,7 +700,7 @@ class AlgoQueryServiceImpl (
     }
 
     fun calcSuperiorProbability(step: Int, catch: Boolean): Double {
-        val weight = if(catch) {
+        val weight = if (catch) {
             1.05
         } else {
             1.0
@@ -446,8 +745,9 @@ class AlgoQueryServiceImpl (
             in 0..14 -> {
                 0.0
             }
+
             in 15..16 -> {
-                if(destroy) 0.0 else 2.1
+                if (destroy) 0.0 else 2.1
             }
 
             17 -> {
@@ -457,16 +757,20 @@ class AlgoQueryServiceImpl (
             in 18..19 -> {
                 2.8
             }
+
             in 20..21 -> {
                 7.0
             }
-            22-> {
+
+            22 -> {
                 19.4
             }
-            23-> {
+
+            23 -> {
                 29.4
             }
-            else-> {
+
+            else -> {
                 39.6
             }
         }
@@ -477,41 +781,51 @@ class AlgoQueryServiceImpl (
             in 0..4 -> {
                 0.0
             }
+
             5 -> {
                 1.8
             }
+
             6 -> {
                 3.0
             }
+
             7 -> {
                 4.2
             }
+
             8 -> {
                 6.0
             }
+
             9 -> {
                 9.5
             }
+
             10 -> {
                 13.0
             }
+
             11 -> {
                 16.3
             }
+
             12 -> {
                 48.5
             }
+
             13 -> {
                 49.0
             }
-            else-> {
+
+            else -> {
                 49.5
             }
         }
     }
 
     fun getCubeLevelUpProb(cube: CubeType, base: RareType): Double {
-        return when(cube) {
+        return when (cube) {
             CubeType.BLACK -> {
                 when (base) {
                     RareType.RARE -> {
@@ -525,6 +839,7 @@ class AlgoQueryServiceImpl (
                     RareType.UNIQUE -> {
                         1.2
                     }
+
                     else -> {
                         0.0
                     }
@@ -544,6 +859,7 @@ class AlgoQueryServiceImpl (
                     RareType.UNIQUE -> {
                         0.3
                     }
+
                     else -> {
                         0.0
                     }
@@ -579,6 +895,7 @@ class AlgoQueryServiceImpl (
                     RareType.UNIQUE -> {
                         0.1996
                     }
+
                     else -> {
                         0.0
                     }
@@ -587,8 +904,8 @@ class AlgoQueryServiceImpl (
         }
     }
 
-    fun getCubeCost(req: Int):Int {
-        return when(req) {
+    fun getCubeCost(req: Int): Int {
+        return when (req) {
             80 -> {
                 16000
             }

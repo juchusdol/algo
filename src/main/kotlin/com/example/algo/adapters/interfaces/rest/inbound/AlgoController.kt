@@ -1,6 +1,7 @@
 package com.example.algo.adapters.interfaces.rest.inbound
 
 import com.example.algo.adapters.interfaces.rest.dto.request.CharacterRequest
+import com.example.algo.adapters.interfaces.rest.dto.response.AmplificationDTO
 import com.example.algo.adapters.interfaces.rest.dto.response.CharacterResponse
 import com.example.algo.adapters.interfaces.rest.dto.response.CubeDTO
 import com.example.algo.adapters.interfaces.rest.dto.response.StarForceDTO
@@ -15,6 +16,7 @@ import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.*
 import org.springframework.web.util.UriComponentsBuilder
 import java.math.BigDecimal
+import java.math.BigInteger
 
 @RequestMapping(value = ["/algo"])
 @RestController
@@ -123,10 +125,13 @@ class AlgoController(
             logger.info(info.getServerName());
         }*/
         val value = query.getServers()
-        return ResponseEntity
-            .ok()
-            .contentType(MediaType.APPLICATION_JSON)
-            .body(value)
+        return query.getServers().let {
+            ResponseEntity
+                .ok()
+                .contentType(MediaType.APPLICATION_JSON)
+                .body(it)
+        }
+
     }
 
     @GetMapping("/server/{serverId}/characters")
@@ -168,6 +173,44 @@ class AlgoController(
             .body(query.getCharacterTimeLine(
                 serverId = serverId,
                 characterId = characterId
+            ))
+    }
+
+    @GetMapping("/amplification")
+    fun getAmplificationValue(
+        count: Int,
+        step: Int,
+        target: Int,
+        safety: Boolean,
+        weapon: Boolean,
+        crystalPrice: Int
+    ): ResponseEntity<AmplificationDTO> {
+        return ResponseEntity
+            .ok()
+            .contentType(MediaType.APPLICATION_JSON)
+            .body(query.getAmplificationValue(
+                count,
+                step,
+                target,
+                safety,
+                weapon,
+                crystalPrice
+            ))
+    }
+
+    @GetMapping("/amplification/ticket")
+    fun getAmplificationValueByTicket(
+        count: Int,
+        base: BigInteger,
+        probability: Int,
+    ): ResponseEntity<AmplificationDTO> {
+        return ResponseEntity
+            .ok()
+            .contentType(MediaType.APPLICATION_JSON)
+            .body(query.getAmplificationValueByTicket(
+                count,
+                base,
+                probability
             ))
     }
 }
