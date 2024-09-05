@@ -14,7 +14,7 @@ import org.springframework.stereotype.Repository
 class QueryRepositoryImpl(
     private val characterRepository: SpringDataMongoCharacterRepository,
     private val template: MongoTemplate
-): QueryRepository {
+) : QueryRepository {
     val characterCollection = "character"
 
     override fun getCharacter(): List<CharacterResponse> {
@@ -45,27 +45,29 @@ class QueryRepositoryImpl(
     }
 
     fun getCharacterResponseOfEntity(query: List<CharacterModel>): List<CharacterResponse> {
-        return query.map { CharacterResponse(
-            name = it.name,
-            status = Status(
-                hp = it.status.hp,
-                mp = it.status.mp,
-                str = it.status.str,
-                dex = it.status.dex,
-                int = it.status.int,
-                luk = it.status.luk,
-            ),
-            power = Power(
-                minimum = it.power.minimum,
-                maximum = it.power.maximum,
-            ),
-            damage = Damage(
-                normal = it.damage.normal,
-                boss = it.damage.boss,
-                critical = it.damage.critical,
-                gongMa = it.damage.gongMa,
-                bangMu = it.damage.bangMu,
+        return query.map {
+            CharacterResponse(
+                name = it.name,
+                status = Status(
+                    hp = it.status.hp,
+                    mp = it.status.mp,
+                    str = it.status.str,
+                    dex = it.status.dex,
+                    int = it.status.int,
+                    luk = it.status.luk,
+                ),
+                power = Power(
+                    minimum = it.power.minimum,
+                    maximum = it.power.maximum,
+                ),
+                damage = Damage(
+                    normal = it.damage.normal,
+                    boss = it.damage.boss,
+                    critical = it.damage.critical,
+                    gongMa = it.damage.gongMa,
+                    bangMu = it.damage.bangMu,
+                )
             )
-        )}
+        }
     }
 }

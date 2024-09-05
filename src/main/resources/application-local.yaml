@@ -6,4 +6,4 @@ spring:
     mongodb:
       #uri: mongodb://root:qwer1234@minikube:27017/vendor_product?authSource=admin
       #uri: mongodb://minikube:27017/mongo_test?authSource=admin
-      uri: mongodb://localhost:27017/mongo_test?authSource=admin
+      uri: mongodb://localhost:27017/df?authSource=admin

@@ -5,7 +5,7 @@ import java.time.LocalDateTime
 
 data class DateObject(
     @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd HH:mm", timezone = "Asia/Seoul")
-    var start:LocalDateTime,
+    var start: LocalDateTime,
     @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd HH:mm", timezone = "Asia/Seoul")
-    var end:LocalDateTime,
+    var end: LocalDateTime,
 )

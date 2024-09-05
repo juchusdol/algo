@@ -11,12 +11,16 @@ import com.example.algo.application.domain.enum.StarForceEvent
 import com.example.algo.application.inbound.AlgoCommandService
 import com.example.algo.application.inbound.AlgoQueryService
 import com.example.algo.application.outbound.dto.*
+import org.springframework.format.annotation.DateTimeFormat
 import org.springframework.http.MediaType
 import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.*
 import org.springframework.web.util.UriComponentsBuilder
 import java.math.BigDecimal
 import java.math.BigInteger
+import java.time.LocalDate
+import java.time.LocalDateTime
+import java.util.Date
 
 @RequestMapping(value = ["/algo"])
 @RestController
@@ -142,10 +146,12 @@ class AlgoController(
         return ResponseEntity
             .ok()
             .contentType(MediaType.APPLICATION_JSON)
-            .body(query.getCharacters(
-                serverId = serverId,
-                characterName = characterName
-            ))
+            .body(
+                query.getCharacters(
+                    serverId = serverId,
+                    characterName = characterName
+                )
+            )
     }
 
     @GetMapping("/server/{serverId}/characters/{characterId}")
@@ -156,24 +162,82 @@ class AlgoController(
         return ResponseEntity
             .ok()
             .contentType(MediaType.APPLICATION_JSON)
-            .body(query.getCharacter(
-                serverId = serverId,
-                characterId = characterId
-            ))
+            .body(
+                query.getCharacter(
+                    serverId = serverId,
+                    characterId = characterId
+                )
+            )
     }
 
     @GetMapping("/server/{serverId}/characters/{characterId}/time-line")
     fun getCharacterTimeLine(
         @PathVariable serverId: String,
-        @PathVariable characterId: String
+        @PathVariable characterId: String,
+        @RequestParam @DateTimeFormat(pattern = "yyyy-MM-dd HH:mm") startDate: LocalDateTime?,
+        @RequestParam @DateTimeFormat(pattern = "yyyy-MM-dd HH:mm") endDate: LocalDateTime?,
     ): ResponseEntity<CharacterTimeLine> {
         return ResponseEntity
             .ok()
             .contentType(MediaType.APPLICATION_JSON)
-            .body(query.getCharacterTimeLine(
-                serverId = serverId,
-                characterId = characterId
-            ))
+            .body(
+                query.getCharacterTimeLine(
+                    serverId = serverId,
+                    characterId = characterId,
+                    startDate = startDate,
+                    endDate = endDate
+                )
+            )
+    }
+
+    @GetMapping("/server/{serverId}/characters/{characterId}/time-line/calc")
+    fun calcCharacterTimeLine(
+        @PathVariable serverId: String,
+        @PathVariable characterId: String,
+    ): ResponseEntity<CharacterTimeLine> {
+        return ResponseEntity
+            .ok()
+            .contentType(MediaType.APPLICATION_JSON)
+            .body(
+                query.calcCharacterTimeLine(
+                    serverId = serverId,
+                    characterId = characterId
+                )
+            )
+    }
+
+    @GetMapping("/characters/{characterId}")
+    fun character(
+        @PathVariable characterId: String,
+    ): ResponseEntity<CharacterBase> {
+        return ResponseEntity
+            .ok()
+            .contentType(MediaType.APPLICATION_JSON)
+            .body(
+                query.character(
+                    characterId = characterId
+                )
+            )
+    }
+
+    @GetMapping("/adventure/{name}")
+    fun charactersByAdventureName(
+        @PathVariable name: String
+    ): ResponseEntity<List<CharacterBase>> {
+        return ResponseEntity
+            .ok()
+            .contentType(MediaType.APPLICATION_JSON)
+            .body(query.getCharactersByAdventureName(name))
+    }
+
+    @GetMapping("/adventure/{name}/statistics/drop")
+    fun dropStatisticsByAdventureName(
+        @PathVariable name: String
+    ): ResponseEntity<List<CharacterBase>> {
+        return ResponseEntity
+            .ok()
+            .contentType(MediaType.APPLICATION_JSON)
+            .body(query.getEpicStatisticsByAdventureName(name))
     }
 
     @GetMapping("/amplification")
@@ -188,14 +252,16 @@ class AlgoController(
         return ResponseEntity
             .ok()
             .contentType(MediaType.APPLICATION_JSON)
-            .body(query.getAmplificationValue(
-                count,
-                step,
-                target,
-                safety,
-                weapon,
-                crystalPrice
-            ))
+            .body(
+                query.getAmplificationValue(
+                    count,
+                    step,
+                    target,
+                    safety,
+                    weapon,
+                    crystalPrice
+                )
+            )
     }
 
     @GetMapping("/amplification/ticket")
@@ -207,10 +273,12 @@ class AlgoController(
         return ResponseEntity
             .ok()
             .contentType(MediaType.APPLICATION_JSON)
-            .body(query.getAmplificationValueByTicket(
-                count,
-                base,
-                probability
-            ))
+            .body(
+                query.getAmplificationValueByTicket(
+                    count,
+                    base,
+                    probability
+                )
+            )
     }
 }

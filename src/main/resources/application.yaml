@@ -5,6 +5,9 @@ server:
       charset: UTF-8
 
 spring:
+  devtools:
+    restart:
+      enabled: false #운영 에서는 제거.
   application:
     name: algo-core
   profiles:
@@ -15,9 +18,6 @@ spring:
         maxRequestSize: 10MB
       encoding:
         charset: UTF-8
-    devtools:
-      restart:
-        enabled: false #운영 에서는 제거.
   cloud:
     openfeign:
       httpclient:

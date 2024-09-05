@@ -12,6 +12,8 @@ import org.springframework.stereotype.Service
 import java.math.BigDecimal
 import java.math.BigInteger
 import java.text.DecimalFormat
+import java.time.LocalDateTime
+import java.time.format.DateTimeFormatter
 import kotlin.math.pow
 import kotlin.math.roundToInt
 
@@ -36,8 +38,26 @@ interface AlgoQueryService {
     fun getServers(): DFBody<ServerInfo>
     fun getCharacters(serverId: String, characterName: String): DFBody<CharacterInfo>
     fun getCharacter(serverId: String, characterId: String): CharacterBase
-    fun getCharacterTimeLine(serverId: String, characterId: String): CharacterTimeLine
-    fun getAmplificationValue(count: Int, step: Int, target: Int, safety: Boolean, weapon: Boolean, crystalPrice: Int): AmplificationDTO
+    fun character(characterId: String): CharacterBase
+    fun getCharacterTimeLine(
+        serverId: String,
+        characterId: String,
+        startDate: LocalDateTime?,
+        endDate: LocalDateTime?
+    ): CharacterTimeLine
+
+    fun calcCharacterTimeLine(serverId: String, characterId: String): CharacterTimeLine
+    fun getCharactersByAdventureName(name: String): List<CharacterBase>?
+    fun getEpicStatisticsByAdventureName(name: String): List<CharacterBase>?
+    fun getAmplificationValue(
+        count: Int,
+        step: Int,
+        target: Int,
+        safety: Boolean,
+        weapon: Boolean,
+        crystalPrice: Int
+    ): AmplificationDTO
+
     fun getAmplificationValueByTicket(count: Int, base: BigInteger, probability: Int): AmplificationDTO
 }
 
@@ -65,20 +85,193 @@ class AlgoQueryServiceImpl(
     }
 
     override fun getCharacter(serverId: String, characterId: String): CharacterBase {
-        return neopleClient.getCharacterInfo(
+        val value = service.findCharacterById(characterId) ?: neopleClient.getCharacterInfo(
             apikey = apiKey,
             serverId = serverId,
             characterId = characterId
-        ).body ?: throw RuntimeException()
+        ).body
+        return value!!
     }
 
-    override fun getCharacterTimeLine(serverId: String, characterId: String): CharacterTimeLine {
+    override fun character(characterId: String): CharacterBase {
+        return service.findCharacterById(characterId) ?: throw RuntimeException()
+    }
+
+    override fun getCharacterTimeLine(
+        serverId: String,
+        characterId: String,
+        startDate: LocalDateTime?,
+        endDate: LocalDateTime?
+    ): CharacterTimeLine {
+
+        val start = LocalDateTime.now().minusMonths(3).plusDays(2).format(DateTimeFormatter.ofPattern("yyyy-MM-dd"))
+        val end = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd"))
+
+        val value = getCharacterTimeLineData(
+            apikey = apiKey,
+            serverId = serverId,
+            characterId = characterId,
+            code = 505,
+            limit = 100,
+            startDate = startDate?.toString() ?: start,
+            endDate = endDate?.toString() ?: end,
+            next = null
+        )
+
+        val character = service.findCharacterById(value.characterId)
+        if (character != null) {
+            value._id = character._id
+        }
+
+        var next: String? = value.timeline.next
+
+        while (next != null) {
+            val additional = getCharacterTimeLineData(
+                apikey = apiKey,
+                serverId = serverId,
+                characterId = characterId,
+                code = 505,
+                limit = 100,
+                startDate = startDate?.toString() ?: start,
+                endDate = endDate?.toString() ?: end,
+                next = next
+            )
+            val list = value.timeline.rows.toMutableList()
+            list.addAll(additional.timeline.rows)
+            value.timeline.rows = list
+            next = additional.timeline.next
+        }
+
+        service.saveCharacter(value)
+        return value
+    }
+
+    override fun calcCharacterTimeLine(serverId: String, characterId: String): CharacterTimeLine {
+        var endDate = LocalDateTime.now()
+        var startDate = endDate.minusMonths(3).plusDays(2)
+
+        service.deleteCharacterById(characterId)
+
+        var value: CharacterTimeLine? = null
+        while (startDate.isAfter(LocalDateTime.of(2023, 11, 1, 0, 0))) {
+            val data = getCharacterTimeLineData(
+                apikey = apiKey,
+                serverId = serverId,
+                characterId = characterId,
+                code = 505,
+                limit = 100,
+                startDate = startDate.format(DateTimeFormatter.ofPattern("yyyy-MM-dd")),
+                endDate = endDate.format(DateTimeFormatter.ofPattern("yyyy-MM-dd")),
+                next = null
+            )
+
+            var next = data.timeline.next
+
+            while (next != null) {
+                val additional = getCharacterTimeLineData(
+                    apikey = apiKey,
+                    serverId = serverId,
+                    characterId = characterId,
+                    code = 505,
+                    limit = 100,
+                    startDate = startDate.format(DateTimeFormatter.ofPattern("yyyy-MM-dd")),
+                    endDate = endDate.format(DateTimeFormatter.ofPattern("yyyy-MM-dd")),
+                    next = next
+                )
+                val list = data.timeline.rows.toMutableList()
+                list.addAll(additional.timeline.rows)
+                data.timeline.rows = list
+                next = additional.timeline.next
+            }
+            if (value == null) {
+                value = data
+            } else {
+                val list = value.timeline.rows.toMutableList()
+                list.addAll(data.timeline.rows)
+                value.timeline.rows = list
+                value.timeline.date.start = startDate
+            }
+            endDate = startDate.minusDays(1)
+            startDate = endDate.minusMonths(3).plusDays(2)
+        }
+        service.saveCharacter(value!!)
+
+        return value
+    }
+
+    override fun getCharactersByAdventureName(name: String): List<CharacterBase>? {
+        return service.getCharactersByAdventureName(name)
+    }
+
+    override fun getEpicStatisticsByAdventureName(name: String): List<CharacterBase> {
+        val values = service.getCharactersByAdventureName(name) ?: throw RuntimeException()
+        val response = mutableListOf<CharacterBase>()
+        values.map {
+            it as CharacterTimeLine
+            val target = CharacterEpicStatistics(
+                _id = it._id,
+                characterId = it.characterId,
+                characterName = it.characterName,
+                level = it.level,
+                jobId = it.jobId,
+                jobGrowId = it.jobGrowId,
+                jobName = it.jobName,
+                jobGrowName = it.jobGrowName,
+                adventureName = it.adventureName
+            )
+            target.beginningCount = it.timeline.rows.count { epic -> epic.data.itemRarity == "태초" }
+            target.mistgearCount = it.timeline.rows.count { epic -> epic.data.mistGear }
+            target.epicCount = it.timeline.rows.count() - target.beginningCount
+
+            val groupByName = it.timeline.rows.groupBy { row -> row.data.channelName }
+            groupByName.keys.map { key ->
+                val dataList = groupByName[key]
+                val groupByChannelData = GroupByChannel(name = key)
+                (dataList?.count { epic -> epic.data.itemRarity == "태초" }
+                    ?: 0).also { groupByChannelData.beginningCount = it }
+                (dataList?.count { epic -> epic.data.mistGear } ?: 0).also { groupByChannelData.mistgearCount = it }
+                groupByChannelData.dropCount = dataList?.size ?: 0
+                target.groupByChannels.add(groupByChannelData)
+
+                val groupByNo = dataList?.groupBy { data -> data.data.channelNo }
+                groupByNo?.keys?.map { no ->
+                    val list = groupByNo[no]
+                    val responseData = GroupByChannelNo()
+                    responseData.no = no
+                    (list?.count { epic -> epic.data.itemRarity == "태초" } ?: 0).also {
+                        responseData.beginningCount = it
+                    }
+                    (list?.count { epic -> epic.data.mistGear } ?: 0).also { responseData.mistgearCount = it }
+                    responseData.dropCount = list?.size ?: 0
+                    groupByChannelData.groupByNos.add(responseData)
+                }
+            }
+            response.add(target)
+        }
+
+
+        return response
+    }
+
+    fun getCharacterTimeLineData(
+        apikey: String,
+        serverId: String,
+        characterId: String,
+        limit: Int,
+        code: Int,
+        startDate: String?,
+        endDate: String?,
+        next: String?
+    ): CharacterTimeLine {
         return neopleClient.getCharacterTimeLine(
             apikey = apiKey,
             serverId = serverId,
             characterId = characterId,
             code = 505,
-            limit = 100
+            limit = 100,
+            startDate = startDate,
+            endDate = endDate,
+            next = next
         ).body ?: throw RuntimeException()
     }
 
@@ -108,14 +301,15 @@ class AlgoQueryServiceImpl(
                     calcSafetyAmplificationValue(stepValue, weapon).toBigInteger()
                 else
                     calcAmplificationValue(weapon).toBigInteger()
-                crystal += if(safety)
+                crystal += if (safety)
                     calcHarmonyValue(stepValue, weapon)
                 else
                     calcContradictionValue(stepValue)
                 returnValue.amplificationCount++
                 val mathValue = Math.random() * 100
-                val probValue = if(safety) calcSafetyAmplificationProbability(stepValue, failedStack)
-                else calcAmplificationProbability(stepValue)
+                val probValue = if (safety) {
+                    calcSafetyAmplificationProbability(stepValue, failedStack)
+                } else calcAmplificationProbability(stepValue)
 
                 if (mathValue < probValue) {
                     stepValue++
@@ -123,15 +317,15 @@ class AlgoQueryServiceImpl(
 
                 } else {
                     failCount++
-                    if(safety)
+                    if (safety)
                         failedStack++
                     else
-                        when(stepValue) {
-                            in 4 .. 6 -> stepValue--
+                        when (stepValue) {
+                            in 4..6 -> stepValue--
                             7 -> stepValue = 4
                             8 -> stepValue = 5
                             9 -> stepValue = 7
-                            in 10 .. 12 -> {
+                            in 10..12 -> {
                                 stepValue = 0
                                 destroyedCount++
                             }
@@ -160,7 +354,7 @@ class AlgoQueryServiceImpl(
         val stDevAvg = stDevs.sumOf { it }.div(count.toBigInteger())
 
         val crystal = returnValues.sumOf { it.crystal.toDouble() } / count
-        val price = if(safety) crystal * crystalPrice else crystal * crystalPrice * 1000
+        val price = if (safety) crystal * crystalPrice else crystal * crystalPrice * 1000
 
         return AmplificationDTO(
             returnValues.sumOf { it.amplificationCount } / count,
@@ -365,18 +559,18 @@ class AlgoQueryServiceImpl(
         bwFile.flush()
         bwFile.close()*/
 
-        var avg = costs.sumOf { it }.div(count.toBigInteger())
-        var stDevs = mutableListOf<BigInteger>()
+        val avg = costs.sumOf { it }.div(count.toBigInteger())
+        val stDevs = mutableListOf<BigInteger>()
 
         for (cost in costs) {
             stDevs.add((cost - avg).pow(2))
         }
 
-        var median = costs.sorted()[(count / 2.0).roundToInt()]
-        var top = costs.sorted()[(count * 0.1).roundToInt()]
-        var low = costs.sorted()[(count * 0.9).roundToInt()]
+        val median = costs.sorted()[(count / 2.0).roundToInt()]
+        val top = costs.sorted()[(count * 0.1).roundToInt()]
+        val low = costs.sorted()[(count * 0.9).roundToInt()]
 
-        var stDevAvg = stDevs.sumOf { it }.div(count.toBigInteger())
+        val stDevAvg = stDevs.sumOf { it }.div(count.toBigInteger())
 
         return StarForceDTO(
             returnValues.sumOf { it.enforceCount } / count,
@@ -493,19 +687,7 @@ class AlgoQueryServiceImpl(
 
     fun calcContradictionValue(step: Int): Int {
         return when (step) {
-            0 -> 1
-            1 -> 2
-            2 -> 3
-            3 -> 4
-            4 -> 5
-            5 -> 6
-            6 -> 7
-            7 -> 8
-            8 -> 9
-            9 -> 10
-            10 -> 11
-            11 -> 12
-            12 -> 13
+            in 0..12 -> step + 1
             else -> 0
         }
     }
@@ -558,9 +740,22 @@ class AlgoQueryServiceImpl(
         }
     }
 
-    fun calcAmplificationProbability(step:Int): Int {
-        return when(step) {
-            in 0 .. 3 -> 100
+    fun calcSafetyAmplificationProbabilityEvent(step: Int, weight: Int): Int {
+        return when (step) {
+            in 0..6 -> {
+                100
+            }
+
+            7 -> 60 + weight * 10
+            8 -> 50 + weight * 10
+            9 -> 40 + weight * 10
+            else -> 0
+        }
+    }
+
+    fun calcAmplificationProbability(step: Int): Int {
+        return when (step) {
+            in 0..3 -> 100
             4 -> 80
             5 -> 70
             6 -> 60
@@ -576,7 +771,7 @@ class AlgoQueryServiceImpl(
 
 
     fun calcEnforceValue(req: Int, step: Int, destroy: Boolean, event: StarForceEvent): Int {
-        var returnValue = 1000
+        val returnValue = 1000
         val reqValue = req * req * req
         val stepValue: Double = (step + 1).toDouble()
         val eventValue = if (event == StarForceEvent.DISCOUNT || event == StarForceEvent.SHINING) 0.7 else 1.0

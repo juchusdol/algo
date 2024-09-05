@@ -3,9 +3,8 @@ package com.example.algo.application.outbound.dto
 import org.bson.types.ObjectId
 
 
-data class CharacterInfo(
+data class CharacterEpicStatistics(
     override var _id: ObjectId?,
-    var serverId: String,
     override var characterId: String,
     override var characterName: String,
     override var level: Int,
@@ -13,5 +12,9 @@ data class CharacterInfo(
     override var jobGrowId: String,
     override var jobName: String,
     override var jobGrowName: String,
-    var fame: Int
+    var adventureName: String,
+    var epicCount: Int = 0,
+    var mistgearCount: Int = 0,
+    var beginningCount: Int = 0,
+    val groupByChannels: MutableList<GroupByChannel> = ArrayList()
 ) : CharacterBase

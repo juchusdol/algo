@@ -10,9 +10,9 @@ interface AlgoCommandService {
 }
 
 @Service
-class AlgoCommandServiceImpl (
+class AlgoCommandServiceImpl(
     val service: AlgoService
-        ) : AlgoCommandService {
+) : AlgoCommandService {
     override fun b1003() {
     }
 

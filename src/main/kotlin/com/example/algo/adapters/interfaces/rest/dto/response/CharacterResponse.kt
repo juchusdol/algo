@@ -22,7 +22,7 @@ data class Damage(
     var bangMu: Double = 0.0,
 )
 
-data class CharacterResponse (
+data class CharacterResponse(
     var name: String = "",
     val status: Status,
     val power: Power,

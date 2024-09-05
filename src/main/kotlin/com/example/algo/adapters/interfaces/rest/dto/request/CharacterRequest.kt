@@ -7,7 +7,7 @@ data class Status(
     val dex: Int = 0,
     val int: Int = 0,
     val luk: Int = 0,
-    )
+)
 
 data class Power(
     val minimum: Int = 0,
